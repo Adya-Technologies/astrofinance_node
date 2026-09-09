@@ -27,7 +27,7 @@ interface UpcomingPayment {
 const fetchDashboardData = async (): Promise<LoanSummary> => {
   // This would be replaced with an actual API call
   // return apiService.get<LoanSummary>('/user/dashboard/summary');
-  
+
   // Mock data for now
   return {
     activeLoans: 2,
@@ -40,7 +40,7 @@ const fetchDashboardData = async (): Promise<LoanSummary> => {
 const fetchUpcomingPayments = async (): Promise<UpcomingPayment[]> => {
   // This would be replaced with an actual API call
   // return apiService.get<UpcomingPayment[]>('/user/dashboard/upcoming-payments');
-  
+
   // Mock data for now
   return [
     {
@@ -68,36 +68,42 @@ const fetchUpcomingPayments = async (): Promise<UpcomingPayment[]> => {
 };
 
 const Dashboard = () => {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isAdmin, isStaff, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
   // Fetch dashboard data
-  const { data: summaryData, isLoading: isSummaryLoading } = useQuery(
+  const { data: summaryData, isLoading: isSummaryLoading } = useQuery<LoanSummary>(
     'dashboardSummary',
     fetchDashboardData,
     {
-      enabled: isAuthenticated,
+      enabled: isAuthenticated && !isAdmin && !isStaff,
       staleTime: 5 * 60 * 1000, // 5 minutes
     }
   );
 
-  const { data: upcomingPayments, isLoading: isPaymentsLoading } = useQuery(
+  const { data: upcomingPayments, isLoading: isPaymentsLoading } = useQuery<UpcomingPayment[]>(
     'upcomingPayments',
     fetchUpcomingPayments,
     {
-      enabled: isAuthenticated,
+      enabled: isAuthenticated && !isAdmin && !isStaff,
       staleTime: 5 * 60 * 1000, // 5 minutes
     }
   );
 
-  // Redirect if not authenticated
+  // Redirect based on role
   React.useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push('/login');
+    if (!authLoading) {
+      if (!isAuthenticated) {
+        router.push('/login');
+      } else if (isAdmin) {
+        router.push('/admin/dashboard');
+      } else if (isStaff) {
+        router.push('/staff/dashboard');
+      }
     }
-  }, [authLoading, isAuthenticated, router]);
+  }, [authLoading, isAuthenticated, isAdmin, isStaff, router]);
 
-  if (authLoading || !isAuthenticated) {
+  if (authLoading || !isAuthenticated || isAdmin || isStaff) {
     return (
       <div className="flex justify-center items-center h-screen">
         <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-primary-500"></div>
@@ -263,13 +269,12 @@ const Dashboard = () => {
                       </td>
                       <td className="whitespace-nowrap px-3 py-4 text-sm">
                         <span
-                          className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${
-                            payment.status === 'PENDING'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : payment.status === 'PAID'
+                          className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${payment.status === 'PENDING'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : payment.status === 'PAID'
                               ? 'bg-green-100 text-green-800'
                               : 'bg-blue-100 text-blue-800'
-                          }`}
+                            }`}
                         >
                           {payment.status}
                         </span>
@@ -304,7 +309,7 @@ const Dashboard = () => {
               <h3 className="mt-2 text-lg font-medium text-gray-900">Apply for a Loan</h3>
               <p className="mt-1 text-sm text-gray-500">Start a new loan application process</p>
             </a>
-            
+
             <a
               href="/payments"
               className="inline-block rounded-md bg-white px-4 py-6 text-center shadow-md hover:shadow-lg transition-shadow duration-200"
@@ -313,7 +318,7 @@ const Dashboard = () => {
               <h3 className="mt-2 text-lg font-medium text-gray-900">Make a Payment</h3>
               <p className="mt-1 text-sm text-gray-500">Pay your upcoming or overdue installments</p>
             </a>
-            
+
             <a
               href="/calculator"
               className="inline-block rounded-md bg-white px-4 py-6 text-center shadow-md hover:shadow-lg transition-shadow duration-200"
@@ -334,7 +339,7 @@ const Dashboard = () => {
 export async function getServerSideProps({ locale }: { locale: string }) {
   return {
     props: {
-      ...(await import('next-i18next/serverSideTranslations').then(m => 
+      ...(await import('next-i18next/serverSideTranslations').then(m =>
         m.serverSideTranslations(locale, ['common', 'user', 'auth'])
       )),
     },

@@ -7,7 +7,7 @@ import logger from '../../../config/logger';
  */
 export const getDashboardSummary = async (req: Request, res: Response) => {
   try {
-    const adminId = req.adminUser?.id;
+    const adminId = req.staff?.id;
 
     if (!adminId) {
       return res.status(401).json({ message: 'Authentication required' });

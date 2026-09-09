@@ -77,8 +77,15 @@ async function cleanupDatabase() {
 			await prisma.journalEntry.deleteMany({});
 		}
 
+		// Delete collection data before staff
+		console.log("Cleaning up collection sessions and entries...");
+		await prisma.collectionAttendance.deleteMany({});
+		await prisma.collectionEntry.deleteMany({});
+		await prisma.collectionSession.deleteMany({});
+
 		// Now proceed with the rest of the cleanup
-		await prisma.adminUserRole.deleteMany({});
+		// Deleted AdminUserRole delete call
+
 		await prisma.rolePermission.deleteMany({});
 		await prisma.roleNavigation.deleteMany({});
 		await prisma.navigationItem.deleteMany({});
@@ -88,7 +95,8 @@ async function cleanupDatabase() {
 		await prisma.staffDocument.deleteMany({});
 		await prisma.staff.deleteMany({});
 		await prisma.role.deleteMany({});
-		await prisma.adminUser.deleteMany({});
+		// Deleted AdminUser delete call
+
 		// Clean up loan-related data first due to foreign key constraints
 		await prisma.loanPayment.deleteMany({});
 		await prisma.loanInstallment.deleteMany({});
@@ -120,51 +128,84 @@ async function cleanupDatabase() {
 }
 
 async function seedAdminUsers() {
-	console.log("Seeding admin users...");
+	console.log("Seeding staff users (formerly admin)...");
 
-	// Create default admin user
+	// Create default admin user (as Staff)
 	const passwordHash = await bcrypt.hash("admin123", 12);
 
-	const adminUser = await prisma.adminUser.create({
+	const adminStaff = await prisma.staff.create({
 		data: {
+			employeeId: "ADMIN001",
 			username: "admin",
 			email: "admin@astrofinance.com",
 			passwordHash,
-			fullName: "System Administrator",
-			isActive: true,
+			firstName: "System",
+			lastName: "Administrator",
+			phone: "9800000000",
+			address: "Headquarters",
+			dateOfBirth: new Date("1990-01-01"),
+			joinDate: new Date(),
+			department: "Administration",
+			position: "System Administrator",
+			status: "ACTIVE"
 		},
 	});
 
-	console.log(`Created admin user: ${adminUser.username}`);
+	console.log(`Created admin staff: ${adminStaff.username}`);
 
 	// Create additional admin users
 	const users = [
 		{
+			employeeId: "MGR001",
 			username: "manager",
 			email: "manager@astrofinance.com",
 			passwordHash,
-			fullName: "Branch Manager",
-			isActive: true,
+			firstName: "Branch",
+			lastName: "Manager",
+			phone: "9800000001",
+			address: "Branch Office",
+			dateOfBirth: new Date("1985-05-15"),
+			joinDate: new Date(),
+			department: "Management",
+			position: "Branch Manager",
+			status: "ACTIVE"
 		},
 		{
+			employeeId: "ACC001",
 			username: "accountant",
 			email: "accountant@astrofinance.com",
 			passwordHash,
-			fullName: "System Accountant",
-			isActive: true,
+			firstName: "System",
+			lastName: "Accountant",
+			phone: "9800000002",
+			address: "Headquarters",
+			dateOfBirth: new Date("1988-08-20"),
+			joinDate: new Date(),
+			department: "Finance",
+			position: "Senior Accountant",
+			status: "ACTIVE"
 		},
 		{
+			employeeId: "LN001",
 			username: "loan_officer",
 			email: "loan@astrofinance.com",
 			passwordHash,
-			fullName: "Loan Officer",
-			isActive: true,
+			firstName: "Loan",
+			lastName: "Officer",
+			phone: "9800000003",
+			address: "Branch Office",
+			dateOfBirth: new Date("1992-03-10"),
+			joinDate: new Date(),
+			department: "Loans",
+			position: "Loan Officer",
+			status: "ACTIVE"
 		},
 	];
 
 	for (const user of users) {
-		await prisma.adminUser.create({ data: user });
-		console.log(`Created admin user: ${user.username}`);
+		// CAST status to StaffStatus
+		await prisma.staff.create({ data: { ...user, status: "ACTIVE" as StaffStatus } });
+		console.log(`Created staff user: ${user.username}`);
 	}
 }
 
@@ -194,6 +235,11 @@ async function seedRolesAndPermissions() {
 			isSystem: true,
 		},
 		{
+			name: "Field Officer",
+			description: "Collects payments and manages field operations",
+			isSystem: true,
+		},
+		{
 			name: "Teller",
 			description: "Handles cash transactions and customer service",
 			isSystem: true,
@@ -219,6 +265,7 @@ async function seedRolesAndPermissions() {
 		"expenses",
 		"usertransactions",
 		"staff",
+		"dashboard", // ADDED for dashboard permissions
 	];
 
 	const actions = ["view", "create", "edit", "delete", "approve"];
@@ -266,58 +313,58 @@ async function seedRolesAndPermissions() {
 		console.log("Assigned all permissions to Super Admin");
 	}
 
-	// Assign admin user to Super Admin role
-	const admin = await prisma.adminUser.findFirst({
+	// Assign admin staff to Super Admin role
+	const adminStaff = await prisma.staff.findFirst({
 		where: { username: "admin" },
 	});
-	if (admin && superAdmin) {
-		await prisma.adminUserRole.create({
+	if (adminStaff && superAdmin) {
+		await prisma.staffRole.create({
 			data: {
-				adminUserId: admin.id,
+				staffId: adminStaff.id,
 				roleId: superAdmin.id,
 			},
 		});
-		console.log("Assigned admin user to Super Admin role");
+		console.log("Assigned admin staff to Super Admin role");
 	}
 
 	// Assign other users to their respective roles
-	const manager = await prisma.adminUser.findFirst({
+	const manager = await prisma.staff.findFirst({
 		where: { username: "manager" },
 	});
 	if (manager && branchManager) {
-		await prisma.adminUserRole.create({
+		await prisma.staffRole.create({
 			data: {
-				adminUserId: manager.id,
+				staffId: manager.id,
 				roleId: branchManager.id,
 			},
 		});
-		console.log("Assigned manager user to Branch Manager role");
+		console.log("Assigned manager staff to Branch Manager role");
 	}
 
-	const accountantUser = await prisma.adminUser.findFirst({
+	const accountantUser = await prisma.staff.findFirst({
 		where: { username: "accountant" },
 	});
 	if (accountantUser && accountant) {
-		await prisma.adminUserRole.create({
+		await prisma.staffRole.create({
 			data: {
-				adminUserId: accountantUser.id,
+				staffId: accountantUser.id,
 				roleId: accountant.id,
 			},
 		});
-		console.log("Assigned accountant user to Accountant role");
+		console.log("Assigned accountant staff to Accountant role");
 	}
 
-	const loanOfficerUser = await prisma.adminUser.findFirst({
+	const loanOfficerUser = await prisma.staff.findFirst({
 		where: { username: "loan_officer" },
 	});
 	if (loanOfficerUser && loanOfficer) {
-		await prisma.adminUserRole.create({
+		await prisma.staffRole.create({
 			data: {
-				adminUserId: loanOfficerUser.id,
+				staffId: loanOfficerUser.id,
 				roleId: loanOfficer.id,
 			},
 		});
-		console.log("Assigned loan_officer user to Loan Officer role");
+		console.log("Assigned loan_officer staff to Loan Officer role");
 	}
 }
 
@@ -344,6 +391,11 @@ async function seedNavigation() {
 		},
 		{ name: "Reports", description: "Reports and analytics", order: 5 },
 		{ name: "Administration", description: "System administration", order: 6 },
+		{
+			name: "Field Operations",
+			description: "Mobile Field Application",
+			order: 7
+		},
 	];
 
 	for (const group of groups) {
@@ -385,10 +437,40 @@ async function seedNavigation() {
 
 		await prisma.navigationItem.create({
 			data: {
+				label: "Admin Dashboard",
+				icon: "admin_panel_settings",
+				url: "/admin/dashboard",
+				order: 2,
+				groupId: dashboardGroup.id,
+			},
+		});
+
+		await prisma.navigationItem.create({
+			data: {
+				label: "Branch Dashboard",
+				icon: "store",
+				url: "/branch/dashboard",
+				order: 3,
+				groupId: dashboardGroup.id,
+			},
+		});
+
+		await prisma.navigationItem.create({
+			data: {
+				label: "Field Dashboard",
+				icon: "location_on",
+				url: "/staff/dashboard",
+				order: 4,
+				groupId: dashboardGroup.id,
+			},
+		});
+
+		await prisma.navigationItem.create({
+			data: {
 				label: "Analytics",
 				icon: "analytics",
 				url: "/analytics",
-				order: 2,
+				order: 5,
 				groupId: dashboardGroup.id,
 			},
 		});
@@ -593,10 +675,30 @@ async function seedNavigation() {
 
 		await prisma.navigationItem.create({
 			data: {
+				label: "Centers",
+				icon: "store",
+				url: "/admin/centers",
+				order: 4,
+				groupId: adminGroup.id,
+			},
+		});
+
+		await prisma.navigationItem.create({
+			data: {
+				label: "Groups",
+				icon: "groups",
+				url: "/admin/groups",
+				order: 5,
+				groupId: adminGroup.id,
+			},
+		});
+
+		await prisma.navigationItem.create({
+			data: {
 				label: "System Settings",
 				icon: "settings",
 				url: "/settings",
-				order: 4,
+				order: 6,
 				groupId: adminGroup.id,
 			},
 		});
@@ -642,12 +744,40 @@ async function seedNavigation() {
 		});
 	}
 
+	// Field Operations Group
+	const fieldGroup = await prisma.navigationGroup.findFirst({
+		where: { name: "Field Operations" },
+	});
+
+	if (fieldGroup) {
+		await prisma.navigationItem.create({
+			data: {
+				label: "Field Dashboard",
+				icon: "smartphone",
+				url: "/field",
+				order: 1,
+				groupId: fieldGroup.id,
+			},
+		});
+
+		await prisma.navigationItem.create({
+			data: {
+				label: "Field Sync",
+				icon: "sync",
+				url: "/field/sync",
+				order: 2,
+				groupId: fieldGroup.id,
+			},
+		});
+	}
+
 	console.log("Navigation items created successfully");
 
 	// Assign navigation to roles
 	const superAdmin = await prisma.role.findFirst({
 		where: { name: "Super Admin" },
 	});
+
 	if (superAdmin) {
 		const allNavItems = await prisma.navigationItem.findMany();
 		for (const item of allNavItems) {
@@ -659,6 +789,131 @@ async function seedNavigation() {
 			});
 		}
 		console.log("Assigned all navigation items to Super Admin role");
+	}
+
+	// Branch Manager - Gets branch dashboard + core features
+	const branchManager = await prisma.role.findFirst({
+		where: { name: "Branch Manager" },
+	});
+
+	if (branchManager) {
+		const branchNavUrls = [
+			"/branch/dashboard",
+			"/loans",
+			"/loans/applications",
+			"/loans/types",
+			"/users",
+			"/users/accounts",
+			"/calculator",
+			"/admin/staff",
+			"/admin/centers",
+			"/admin/groups",
+		];
+
+		const branchNavs = await prisma.navigationItem.findMany({
+			where: { url: { in: branchNavUrls } },
+		});
+
+		for (const nav of branchNavs) {
+			await prisma.roleNavigation.create({
+				data: {
+					roleId: branchManager.id,
+					navigationItemId: nav.id,
+				},
+			});
+		}
+		console.log("Assigned navigation to Branch Manager role");
+	}
+
+	// Loan Officer - Gets loan management features
+	const loanOfficer = await prisma.role.findFirst({
+		where: { name: "Loan Officer" },
+	});
+
+	if (loanOfficer) {
+		const officerNavUrls = [
+			"/loans/applications",
+			"/loans",
+			"/calculator",
+			"/users",
+		];
+
+		const officerNavs = await prisma.navigationItem.findMany({
+			where: { url: { in: officerNavUrls } },
+		});
+
+		for (const nav of officerNavs) {
+			await prisma.roleNavigation.create({
+				data: {
+					roleId: loanOfficer.id,
+					navigationItemId: nav.id,
+				},
+			});
+		}
+		console.log("Assigned navigation to Loan Officer role");
+	}
+
+	// Field Officer - Gets field dashboard + collection features
+	const fieldOfficer = await prisma.role.findFirst({
+		where: { name: "Field Officer" },
+	});
+
+	if (fieldOfficer) {
+		const fieldNavUrls = [
+			"/field",
+			"/field/sync",
+			"/loans/applications",
+			"/loans",
+			"/calculator",
+			"/users",
+		];
+
+		const fieldNavs = await prisma.navigationItem.findMany({
+			where: { url: { in: fieldNavUrls } },
+		});
+
+		for (const nav of fieldNavs) {
+			await prisma.roleNavigation.create({
+				data: {
+					roleId: fieldOfficer.id,
+					navigationItemId: nav.id,
+				},
+			});
+		}
+		console.log("Assigned navigation to Field Officer role");
+	}
+
+	// Accountant - Gets accounting features
+	const accountant = await prisma.role.findFirst({
+		where: { name: "Accountant" },
+	});
+
+	if (accountant) {
+		const accountantNavUrls = [
+			"/dashboard",
+			"accounting/chart-of-accounts",
+			"accounting/journal-entries",
+			"accounting/day-books",
+			"accounting/reports",
+			"/admin/shares",
+			"/accounting/llp",
+			"/report-templates",
+			"/generate-reports",
+		];
+
+		const accountantNavs = await prisma.navigationItem.findMany({
+			where: { url: { in: accountantNavUrls } },
+		});
+
+		for (const nav of accountantNavs) {
+			await prisma.roleNavigation.create({
+				data: {
+					roleId: accountant.id,
+					navigationItemId: nav.id,
+				},
+			});
+		}
+		console.log("Assigned navigation to Accountant role");
 	}
 }
 

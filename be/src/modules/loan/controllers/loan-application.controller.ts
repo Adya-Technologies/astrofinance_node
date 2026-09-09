@@ -215,7 +215,8 @@ export const getAllLoanApplications = async (req: Request, res: Response) => {
 					select: {
 						id: true,
 						username: true,
-						fullName: true,
+						firstName: true,
+						lastName: true,
 					},
 				},
 			},
@@ -268,7 +269,8 @@ export const getLoanApplicationById = async (req: Request, res: Response) => {
 					select: {
 						id: true,
 						username: true,
-						fullName: true,
+						firstName: true,
+						lastName: true,
 					},
 				},
 				documents: {
@@ -277,7 +279,8 @@ export const getLoanApplicationById = async (req: Request, res: Response) => {
 							select: {
 								id: true,
 								username: true,
-								fullName: true,
+								firstName: true,
+								lastName: true,
 							},
 						},
 					},
@@ -371,13 +374,13 @@ export const createLoanApplication = async (req: Request, res: Response) => {
 			// Document handling is not implemented in the current schema
 			// Commenting out for now
 			/*
-      if (documents.length > 0) {
-        for (const doc of documents) {
-          // Document creation logic would go here
-          console.log(`Would create document: ${doc.documentName} for application ${app.id}`);
-        }
-      }
-      */
+	  if (documents.length > 0) {
+		for (const doc of documents) {
+		  // Document creation logic would go here
+		  console.log(`Would create document: ${doc.documentName} for application ${app.id}`);
+		}
+	  }
+	  */
 
 			return app;
 		});
@@ -432,7 +435,7 @@ export const updateLoanApplicationStatus = async (
 	try {
 		const { id } = req.params;
 		const { status, rejectionReason } = req.body;
-		const adminUserId = req.adminUser.id;
+		const adminUserId = req.staff?.id;
 
 		// Check if application exists
 		const existingApplication = await prisma.loanApplication.findUnique({
@@ -528,16 +531,16 @@ export const uploadLoanDocument = async (req: Request, res: Response) => {
 		// Document handling is not implemented in the current schema
 		// Commenting out for now
 		/*
-    const document = await prisma.loanDocument.create({
-      data: {
-        loanApplicationId: id,
-        documentType,
-        documentName,
-        filePath,
-        uploadDate: new Date()
-      }
-    });
-    */
+	const document = await prisma.loanDocument.create({
+	  data: {
+		loanApplicationId: id,
+		documentType,
+		documentName,
+		filePath,
+		uploadDate: new Date()
+	  }
+	});
+	*/
 
 		// Log the document info instead
 		logger.info(

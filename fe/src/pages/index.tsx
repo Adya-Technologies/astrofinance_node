@@ -4,13 +4,15 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export default function Home() {
   const router = useRouter();
-  const { isAuthenticated, isAdmin, isLoading } = useAuth();
+  const { isAuthenticated, isAdmin, isStaff, isLoading } = useAuth();
 
   useEffect(() => {
     if (!isLoading) {
       if (isAuthenticated) {
         if (isAdmin) {
           router.push('/admin/dashboard');
+        } else if (isStaff) {
+          router.push('/staff/dashboard');
         } else {
           router.push('/dashboard');
         }
@@ -18,7 +20,7 @@ export default function Home() {
         router.push('/login');
       }
     }
-  }, [isAuthenticated, isAdmin, isLoading, router]);
+  }, [isAuthenticated, isAdmin, isStaff, isLoading, router]);
 
   return (
     <div className="flex justify-center items-center h-screen">

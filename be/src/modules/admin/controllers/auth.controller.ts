@@ -12,17 +12,17 @@ const JWT_SECRET: Secret = process.env.JWT_SECRET as string;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 
 /**
- * Admin login controller
+ * Admin login controller (Now authenticates Staff with Admin access)
  */
 export const login = async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
 
-    // Find admin user by username or email
-    const adminUser = await prisma.adminUser.findFirst({
+    // Find staff by username or email
+    const staff = await prisma.staff.findFirst({
       where: {
         OR: [
-          { username },
+          { username: username },
           { email: username }
         ]
       },
@@ -49,30 +49,35 @@ export const login = async (req: Request, res: Response) => {
     });
 
     // Check if user exists
-    if (!adminUser) {
+    if (!staff) {
       return res.status(401).json({ message: 'Invalid username or password' });
     }
 
     // Check if user is active
-    if (!adminUser.isActive) {
+    if (staff.status !== 'ACTIVE') {
       return res.status(403).json({ message: 'Your account is inactive. Please contact the administrator.' });
     }
 
-    // Verify password
-    const isPasswordValid = await bcrypt.compare(password, adminUser.passwordHash);
+    // Verify password (check passwordHash)
+    // Note: Staff model might use different password field? Schema shows passwordHash.
+    if (!staff.passwordHash) {
+      return res.status(401).json({ message: 'Account not set up for password login' });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, staff.passwordHash);
     if (!isPasswordValid) {
       return res.status(401).json({ message: 'Invalid username or password' });
     }
 
     // Extract role names for the token
-    const roleNames = adminUser.roles.map(r => r.role.name);
-    
-    // Generate JWT token
+    const roleNames = staff.roles.map(r => r.role.name);
+
+    // Generate JWT token (UserType ADMIN for backward compatibility with FE)
     const token = jwt.sign(
-      { 
-        id: adminUser.id, 
-        username: adminUser.username, 
-        email: adminUser.email,
+      {
+        id: staff.id,
+        username: staff.username,
+        email: staff.email,
         userType: 'ADMIN',
         roles: roleNames
       },
@@ -81,21 +86,21 @@ export const login = async (req: Request, res: Response) => {
     );
 
     // Update last login timestamp
-    await prisma.adminUser.update({
-      where: { id: adminUser.id },
+    await prisma.staff.update({
+      where: { id: staff.id },
       data: { lastLogin: new Date() }
     });
 
     // Extract permissions and navigation items
     const permissions = new Set<string>();
     const navigationItems: any[] = [];
-    
-    adminUser.roles.forEach(roleAssignment => {
+
+    staff.roles.forEach(roleAssignment => {
       // Add permissions
       roleAssignment.role.permissions.forEach(permissionAssignment => {
         permissions.add(permissionAssignment.permission.code);
       });
-      
+
       // Add navigation items
       roleAssignment.role.navigation.forEach(navAssignment => {
         navigationItems.push(navAssignment.navigationItem);
@@ -105,24 +110,24 @@ export const login = async (req: Request, res: Response) => {
     // Create audit log
     await createAuditLog(
       req,
-      'AdminUser',
-      adminUser.id,
+      'Staff', // Changed from AdminUser
+      staff.id,
       AuditAction.LOGIN,
       null,
       null,
-      { method: 'username/password' }
+      { method: 'username/password', interface: 'admin' }
     );
 
     // Return user data and token
     return res.json({
       user: {
-        id: adminUser.id,
-        username: adminUser.username,
-        email: adminUser.email,
-        fullName: adminUser.fullName,
+        id: staff.id,
+        username: staff.username,
+        email: staff.email,
+        fullName: `${staff.firstName} ${staff.lastName}`,
         userType: 'ADMIN', // Explicitly set userType for admin users
-        isActive: adminUser.isActive,
-        roles: adminUser.roles.map(r => ({
+        isActive: staff.status === 'ACTIVE',
+        roles: staff.roles.map(r => ({
           id: r.role.id,
           name: r.role.name
         })),
@@ -143,11 +148,11 @@ export const login = async (req: Request, res: Response) => {
 export const logout = async (req: Request, res: Response) => {
   try {
     // Create audit log if user is authenticated
-    if (req.adminUser) {
+    if (req.staff) {
       await createAuditLog(
         req,
-        'AdminUser',
-        req.adminUser.id,
+        'Staff',
+        req.staff.id,
         AuditAction.LOGOUT,
         null,
         null
@@ -156,7 +161,7 @@ export const logout = async (req: Request, res: Response) => {
 
     // Note: JWT tokens are stateless, so we can't invalidate them server-side
     // The client should remove the token from storage
-    
+
     return res.json({ message: 'Logged out successfully' });
   } catch (error) {
     logger.error('Logout error:', error);
@@ -170,12 +175,13 @@ export const logout = async (req: Request, res: Response) => {
 export const getProfile = async (req: Request, res: Response) => {
   try {
     // User is already attached to request by auth middleware
-    const adminUser = req.adminUser;
-    
+    // req.staff is mapped to the Staff object in auth.middleware
+    const staff = req.staff;
+
     // Extract permissions
     const permissions = new Set<string>();
-    
-    adminUser.roles.forEach((roleAssignment: any) => {
+
+    staff.roles.forEach((roleAssignment: any) => {
       roleAssignment.role.permissions.forEach((permissionAssignment: any) => {
         permissions.add(permissionAssignment.permission.code);
       });
@@ -183,18 +189,18 @@ export const getProfile = async (req: Request, res: Response) => {
 
     // Return user data
     return res.json({
-      id: adminUser.id,
-      username: adminUser.username,
-      email: adminUser.email,
-      fullName: adminUser.fullName,
+      id: staff.id,
+      username: staff.username,
+      email: staff.email,
+      fullName: `${staff.firstName} ${staff.lastName}`,
       userType: 'ADMIN', // Explicitly set userType for admin users
-      isActive: adminUser.isActive,
-      roles: adminUser.roles.map((r: any) => ({
+      isActive: staff.status === 'ACTIVE',
+      roles: staff.roles.map((r: any) => ({
         id: r.role.id,
         name: r.role.name
       })),
       permissions: Array.from(permissions),
-      lastLogin: adminUser.lastLogin
+      lastLogin: staff.lastLogin
     });
   } catch (error) {
     logger.error('Get profile error:', error);
@@ -208,10 +214,14 @@ export const getProfile = async (req: Request, res: Response) => {
 export const changePassword = async (req: Request, res: Response) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    const adminUser = req.adminUser;
+    const staff = req.staff;
+
+    if (!staff.passwordHash) {
+      return res.status(400).json({ message: 'Password not set on account' });
+    }
 
     // Verify current password
-    const isPasswordValid = await bcrypt.compare(currentPassword, adminUser.passwordHash);
+    const isPasswordValid = await bcrypt.compare(currentPassword, staff.passwordHash);
     if (!isPasswordValid) {
       return res.status(401).json({ message: 'Current password is incorrect' });
     }
@@ -220,16 +230,19 @@ export const changePassword = async (req: Request, res: Response) => {
     const passwordHash = await bcrypt.hash(newPassword, 10);
 
     // Update password
-    await prisma.adminUser.update({
-      where: { id: adminUser.id },
-      data: { passwordHash }
+    await prisma.staff.update({
+      where: { id: staff.id },
+      data: {
+        passwordHash,
+        passwordChangedAt: new Date()
+      }
     });
 
     // Create audit log
     await createAuditLog(
       req,
-      'AdminUser',
-      adminUser.id,
+      'Staff',
+      staff.id,
       AuditAction.PASSWORD_CHANGE,
       null,
       null

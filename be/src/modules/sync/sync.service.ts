@@ -1,4 +1,5 @@
 import prisma from '../../config/database';
+import { createJournalEntryForUserTransaction } from '../user/utils/journal-entry-mapping.util';
 
 export const downloadData = async (userId: string) => {
     // Find staff associated with the user/admin
@@ -47,93 +48,163 @@ export const uploadData = async (data: any) => {
 
     const stats = {
         session: { status: 'PENDING' as 'ADDED' | 'SKIPPED' | 'PENDING', id: '' },
-        entries: { added: 0, skipped: 0 },
+        entries: { added: 0, skipped: 0, transactionsCreated: 0 },
         attendance: { added: 0, skipped: 0 }
     };
 
-    // 1. Create or Find Collection Session
-    let collectionSession = await prisma.collectionSession.findFirst({
-        where: { offlineId: session.id }
-    });
-
-    if (!collectionSession) {
-        collectionSession = await prisma.collectionSession.create({
-            data: {
-                staffId: session.staffId,
-                centerId: session.centerId,
-                startedAt: session.startedAt,
-                endedAt: session.endedAt,
-                status: 'SUBMITTED',
-                offlineId: session.id,
-                latitude: session.latitude,
-                longitude: session.longitude
-            }
+    // Wrap entire upload in a transaction for atomicity
+    await prisma.$transaction(async (tx) => {
+        // 1. Create or Find Collection Session
+        let collectionSession = await tx.collectionSession.findFirst({
+            where: { offlineId: session.id }
         });
-        stats.session.status = 'ADDED';
-    } else {
-        stats.session.status = 'SKIPPED';
-    }
-    stats.session.id = collectionSession.id;
 
-    // 2. Process Entries
-    if (entries && Array.isArray(entries)) {
-        for (const entry of entries) {
-            const existing = await prisma.collectionEntry.findFirst({
-                where: { offlineId: entry.id }
+        if (!collectionSession) {
+            collectionSession = await tx.collectionSession.create({
+                data: {
+                    staffId: session.staffId,
+                    centerId: session.centerId,
+                    startedAt: session.startedAt,
+                    endedAt: session.endedAt,
+                    status: 'SUBMITTED',
+                    offlineId: session.id,
+                    latitude: session.latitude,
+                    longitude: session.longitude
+                }
             });
+            stats.session.status = 'ADDED';
+        } else {
+            stats.session.status = 'SKIPPED';
+        }
+        stats.session.id = collectionSession.id;
 
-            if (!existing) {
-                await prisma.collectionEntry.create({
-                    data: {
-                        sessionId: collectionSession.id,
-                        userId: entry.userId,
-                        accountId: entry.accountId,
-                        transactionType: entry.transactionType,
-                        amount: entry.amount,
-                        notes: entry.notes,
-                        collectedAt: entry.collectedAt,
-                        isSynced: true,
-                        offlineId: entry.id,
-                        latitude: entry.latitude,
-                        longitude: entry.longitude
-                    }
+        // 2. Process Entries with Account Transaction Integration
+        if (entries && Array.isArray(entries)) {
+            for (const entry of entries) {
+                const existing = await tx.collectionEntry.findFirst({
+                    where: { offlineId: entry.id }
                 });
-                stats.entries.added++;
-            } else {
-                stats.entries.skipped++;
+
+                if (!existing) {
+                    // Create collection entry
+                    await tx.collectionEntry.create({
+                        data: {
+                            sessionId: collectionSession.id,
+                            userId: entry.userId,
+                            accountId: entry.accountId,
+                            transactionType: entry.transactionType,
+                            amount: entry.amount,
+                            notes: entry.notes,
+                            collectedAt: entry.collectedAt,
+                            isSynced: true,
+                            offlineId: entry.id,
+                            latitude: entry.latitude,
+                            longitude: entry.longitude
+                        }
+                    });
+                    stats.entries.added++;
+
+                    // **NEW: Post to Account if accountId is provided**
+                    if (entry.accountId) {
+                        // Fetch current account balance
+                        const account = await tx.userAccount.findUnique({
+                            where: { id: entry.accountId }
+                        });
+
+                        if (account) {
+                            const amount = parseFloat(entry.amount.toString());
+                            const newBalance = parseFloat(account.balance.toString()) + amount;
+
+                            // Create account transaction
+                            const accountTransaction = await tx.userAccountTransaction.create({
+                                data: {
+                                    accountId: entry.accountId,
+                                    amount: amount,
+                                    transactionType: entry.transactionType === 'DEPOSIT' ? 'DEPOSIT' : 'WITHDRAWAL',
+                                    transactionDate: new Date(entry.collectedAt),
+                                    description: `Field collection - ${entry.notes || 'Collection'}`,
+                                    referenceNumber: entry.id, // Use offlineId as reference
+                                    runningBalance: newBalance
+                                }
+                            });
+
+                            // **NEW: Create corresponding Journal Entry for double-entry accounting**
+                            try {
+                                const journalEntryId = await createJournalEntryForUserTransaction(
+                                    {
+                                        id: accountTransaction.id,
+                                        transactionType: accountTransaction.transactionType,
+                                        amount: accountTransaction.amount,
+                                        description: accountTransaction.description,
+                                        referenceNumber: accountTransaction.referenceNumber,
+                                        transactionDate: accountTransaction.transactionDate
+                                    },
+                                    session.staffId // Now staffId is valid since JournalEntry uses Staff
+                                );
+
+                                // Link journal entry to transaction
+                                await tx.userAccountTransaction.update({
+                                    where: { id: accountTransaction.id },
+                                    data: { journalEntryId }
+                                });
+
+                                console.log(`Created journal entry ${journalEntryId} for collection ${entry.id}`);
+                            } catch (journalError) {
+                                console.error('Error creating journal entry for collection:', journalError);
+                                // Don't fail the entire upload if journal entry creation fails
+                                // The transaction record still exists for reconciliation
+                            }
+
+                            // Update account balance
+                            await tx.userAccount.update({
+                                where: { id: entry.accountId },
+                                data: {
+                                    balance: newBalance,
+                                    lastTransactionDate: new Date(entry.collectedAt)
+                                }
+                            });
+
+                            stats.entries.transactionsCreated++;
+                        } else {
+                            console.warn(`Account not found for entry: ${entry.id}`);
+                        }
+                    }
+                } else {
+                    stats.entries.skipped++;
+                }
             }
         }
-    }
 
-    // 3. Process Attendance
-    if (attendance && Array.isArray(attendance)) {
-        for (const att of attendance) {
-            const existing = await prisma.collectionAttendance.findFirst({
-                where: { offlineId: att.id }
-            });
-
-            if (!existing) {
-                await prisma.collectionAttendance.create({
-                    data: {
-                        sessionId: collectionSession.id,
-                        userId: att.userId,
-                        status: att.status,
-                        notes: att.notes,
-                        offlineId: att.id
-                    }
+        // 3. Process Attendance
+        if (attendance && Array.isArray(attendance)) {
+            for (const att of attendance) {
+                const existing = await tx.collectionAttendance.findFirst({
+                    where: { offlineId: att.id }
                 });
-                stats.attendance.added++;
-            } else {
-                stats.attendance.skipped++;
+
+                if (!existing) {
+                    await tx.collectionAttendance.create({
+                        data: {
+                            sessionId: collectionSession.id,
+                            userId: att.userId,
+                            status: att.status,
+                            notes: att.notes,
+                            offlineId: att.id
+                        }
+                    });
+                    stats.attendance.added++;
+                } else {
+                    stats.attendance.skipped++;
+                }
             }
         }
-    }
+    });
 
     return {
         success: true,
-        sessionId: collectionSession.id,
-        processedEntries: stats.entries.added, // Keep explicitly for backward compat if any
-        processedAttendance: stats.attendance.added, // Keep explicitly for backward compat if any
-        stats // Return the full detailed stats object
+        sessionId: stats.session.id,
+        processedEntries: stats.entries.added,
+        processedAttendance: stats.attendance.added,
+        stats
     };
 };

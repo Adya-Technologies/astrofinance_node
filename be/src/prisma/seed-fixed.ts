@@ -62,38 +62,38 @@ async function cleanupDatabase() {
 			console.log(`Found ${journalEntryLinesCount} journal entry lines. Deleting...`);
 			await prisma.journalEntryLine.deleteMany({});
 		}
-		
+
 		const journalEntriesCount = await prisma.journalEntry.count();
 		if (journalEntriesCount > 0) {
 			console.log(`Found ${journalEntriesCount} journal entries. Deleting...`);
 			await prisma.journalEntry.deleteMany({});
 		}
-		
+
 		// Now proceed with the rest of the cleanup
-		await prisma.adminUserRole.deleteMany({});
+		// Removed AdminUserRole delete call
 		await prisma.rolePermission.deleteMany({});
 		await prisma.roleNavigation.deleteMany({});
 		await prisma.navigationItem.deleteMany({});
 		await prisma.navigationGroup.deleteMany({});
 		await prisma.permission.deleteMany({});
-		await prisma.staffRole.deleteMany({}); 
+		await prisma.staffRole.deleteMany({});
 		await prisma.staffDocument.deleteMany({});
 		await prisma.staff.deleteMany({});
 		await prisma.role.deleteMany({});
-		await prisma.adminUser.deleteMany({});
+		// Removed AdminUser delete calls
 		await prisma.loanType.deleteMany({});
-		
+
 		// Check for any other dependencies on account_COA
 		console.log("Checking for other dependencies on accounts...");
 		await prisma.account_COA.deleteMany({});
-		
+
 		await prisma.smsTemplate.deleteMany({});
 		await prisma.smsEvent.deleteMany({});
 		await prisma.taxRate.deleteMany({});
 		await prisma.taxType.deleteMany({});
 		await prisma.expenseCategory.deleteMany({});
 		await prisma.reportTemplate.deleteMany({});
-		
+
 		console.log("Database cleanup completed successfully");
 	} catch (error) {
 		console.error("Error during database cleanup:", error);
@@ -102,51 +102,84 @@ async function cleanupDatabase() {
 }
 
 async function seedAdminUsers() {
-	console.log("Seeding admin users...");
+	console.log("Seeding admin users (as Staff)...");
 
 	// Create default admin user
 	const passwordHash = await bcrypt.hash("Admin@123", 10);
 
-	const adminUser = await prisma.adminUser.create({
+	const adminStaff = await prisma.staff.create({
 		data: {
+			employeeId: "ADMIN001",
 			username: "admin",
 			email: "admin@astrofinance.com",
 			passwordHash,
-			fullName: "System Administrator",
-			isActive: true,
+			firstName: "System",
+			lastName: "Administrator",
+			phone: "9800000000",
+			address: "Head Office",
+			dateOfBirth: new Date("1980-01-01"),
+			joinDate: new Date(),
+			department: "Administration",
+			position: "System Administrator",
+			status: "ACTIVE"
 		},
 	});
 
-	console.log(`Created admin user: ${adminUser.username}`);
+	console.log(`Created admin staff: ${adminStaff.username}`);
 
 	// Create additional admin users
 	const users = [
 		{
+			employeeId: "MGR001",
 			username: "manager",
 			email: "manager@astrofinance.com",
 			passwordHash,
-			fullName: "Branch Manager",
-			isActive: true,
+			firstName: "Branch",
+			lastName: "Manager",
+			phone: "9800000001",
+			address: "Branch Office",
+			dateOfBirth: new Date("1985-05-15"),
+			joinDate: new Date(),
+			department: "Management",
+			position: "Branch Manager",
+			status: "ACTIVE"
 		},
 		{
+			employeeId: "ACC001",
 			username: "accountant",
 			email: "accountant@astrofinance.com",
 			passwordHash,
-			fullName: "System Accountant",
-			isActive: true,
+			firstName: "System",
+			lastName: "Accountant",
+			phone: "9800000002",
+			address: "Headquarters",
+			dateOfBirth: new Date("1988-08-20"),
+			joinDate: new Date(),
+			department: "Finance",
+			position: "Senior Accountant",
+			status: "ACTIVE"
 		},
 		{
+			employeeId: "LN001",
 			username: "loan_officer",
 			email: "loan@astrofinance.com",
 			passwordHash,
-			fullName: "Loan Officer",
-			isActive: true,
+			firstName: "Loan",
+			lastName: "Officer",
+			phone: "9800000003",
+			address: "Branch Office",
+			dateOfBirth: new Date("1992-03-10"),
+			joinDate: new Date(),
+			department: "Loans",
+			position: "Loan Officer",
+			status: "ACTIVE"
 		},
 	];
 
 	for (const user of users) {
-		await prisma.adminUser.create({ data: user });
-		console.log(`Created admin user: ${user.username}`);
+		// Cast to StaffStatus to satisfy typescript if needed, or simply pass string if enum matches
+		await prisma.staff.create({ data: { ...user, status: "ACTIVE" as StaffStatus } });
+		console.log(`Created staff user: ${user.username}`);
 	}
 }
 
@@ -301,8 +334,8 @@ async function seedLoanTypes() {
 				console.log(`Updated loan type: ${updated.name} (${updated.code})`);
 			} else {
 				// Create new loan type
-				const created = await prisma.loanType.create({ 
-					data: loanType 
+				const created = await prisma.loanType.create({
+					data: loanType
 				});
 				console.log(`Created loan type: ${created.name} (${created.code})`);
 			}

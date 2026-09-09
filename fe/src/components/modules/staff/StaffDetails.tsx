@@ -64,20 +64,24 @@ const StaffDetails: React.FC<StaffDetailsProps> = ({ staff }) => {
             <p className="mt-1 max-w-2xl text-sm text-gray-500">Personal details and role assignments.</p>
           </div>
           <div className="flex space-x-3">
-            <Link href={`/office/staff/${staff.id}/reset-password`}>
-              <Button variant="outline" className="flex items-center">
-                <KeyIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-                Reset Password
-              </Button>
-            </Link>
-            <Link href={`/office/staff/${staff.id}/edit`}>
-              <Button variant="primary" className="flex items-center">
-                <PencilIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-                Edit
-              </Button>
-            </Link>
-            <Button 
-              variant="danger" 
+            <Button
+              variant="outline"
+              className="flex items-center"
+              onClick={() => router.push(`/office/staff/${staff.id}/reset-password`)}
+            >
+              <KeyIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+              Reset Password
+            </Button>
+            <Button
+              variant="primary"
+              className="flex items-center"
+              onClick={() => router.push(`/office/staff/${staff.id}/edit`)}
+            >
+              <PencilIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+              Edit
+            </Button>
+            <Button
+              variant="danger"
               className="flex items-center"
               onClick={handleDeleteClick}
             >
@@ -185,7 +189,7 @@ const StaffDetails: React.FC<StaffDetailsProps> = ({ staff }) => {
       >
         <div className="mt-2">
           <p className="text-sm text-gray-500">
-            Are you sure you want to delete {staff.firstName} {staff.lastName}? 
+            Are you sure you want to delete {staff.firstName} {staff.lastName}?
             This action cannot be undone and will remove all associated data.
           </p>
         </div>

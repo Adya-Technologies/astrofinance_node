@@ -1,6 +1,6 @@
 import { Router, type Router as ExpressRouter } from 'express';
 import authRoutes from './auth.routes';
-import adminUserRoutes from './admin-user.routes';
+import usersRoutes from './users.routes';
 import staffRoutes from './staff.routes';
 import roleRoutes from './role.routes';
 import navigationRoutes from './navigation.routes';
@@ -16,7 +16,7 @@ router.use('/auth', authRoutes);
 router.use('/dashboard', dashboardRoutes);
 
 // Admin user routes (legacy)
-router.use('/users', adminUserRoutes);
+router.use('/users', usersRoutes);
 
 // Staff management routes
 router.use('/staff', staffRoutes);

@@ -13,8 +13,8 @@ export const createAccountValidation = [
 	body("accountType")
 		.notEmpty()
 		.withMessage("Account type is required")
-		.isUUID()
-		.withMessage("Account type must be a valid UUID"),
+		.isString()
+		.withMessage("Account type must be a string"),
 	body("interestRate")
 		.notEmpty()
 		.withMessage("Interest rate is required")

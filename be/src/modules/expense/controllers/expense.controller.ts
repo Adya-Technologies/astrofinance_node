@@ -11,14 +11,14 @@ import { ApiError } from '../../../common/middleware/error.middleware';
 export const getAllExpenseCategories = async (req: Request, res: Response) => {
   try {
     const { type } = req.query;
-    
+
     // Build filter conditions
     const where: any = {};
-    
+
     if (type) {
       where.type = type;
     }
-    
+
     const categories = await prisma.expenseCategory.findMany({
       where,
       orderBy: {
@@ -61,12 +61,12 @@ export const getExpenseCategoryById = async (req: Request, res: Response) => {
  */
 export const createExpenseCategory = async (req: Request, res: Response) => {
   try {
-    const { 
-      name, 
-      description, 
-      type, 
-      accountId, 
-      isActive = true 
+    const {
+      name,
+      description,
+      type,
+      accountId,
+      isActive = true
     } = req.body;
 
     // Check if category with same name already exists
@@ -128,12 +128,12 @@ export const createExpenseCategory = async (req: Request, res: Response) => {
 export const updateExpenseCategory = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { 
-      name, 
-      description, 
-      type, 
-      accountId, 
-      isActive 
+    const {
+      name,
+      description,
+      type,
+      accountId,
+      isActive
     } = req.body;
 
     // Check if expense category exists
@@ -260,41 +260,41 @@ export const deleteExpenseCategory = async (req: Request, res: Response) => {
  */
 export const getAllExpenses = async (req: Request, res: Response) => {
   try {
-    const { 
-      category, 
-      startDate, 
-      endDate, 
-      page = '1', 
-      limit = '10' 
+    const {
+      category,
+      startDate,
+      endDate,
+      page = '1',
+      limit = '10'
     } = req.query;
-    
+
     // Parse pagination parameters
     const pageNumber = parseInt(page as string, 10);
     const limitNumber = parseInt(limit as string, 10);
     const skip = (pageNumber - 1) * limitNumber;
-    
+
     // Build filter conditions
     const where: any = {};
-    
+
     if (category) {
       where.categoryId = category;
     }
-    
+
     if (startDate || endDate) {
       where.expenseDate = {};
-      
+
       if (startDate) {
         where.expenseDate.gte = new Date(startDate as string);
       }
-      
+
       if (endDate) {
         where.expenseDate.lte = new Date(endDate as string);
       }
     }
-    
+
     // Get total count for pagination
     const totalCount = await prisma.expense.count({ where });
-    
+
     // Get expenses with pagination
     const expenses = await prisma.expense.findMany({
       where,
@@ -307,7 +307,7 @@ export const getAllExpenses = async (req: Request, res: Response) => {
       skip,
       take: limitNumber
     });
-    
+
     return res.json({
       data: expenses,
       pagination: {
@@ -354,14 +354,14 @@ export const getExpenseById = async (req: Request, res: Response) => {
  */
 export const createExpense = async (req: Request, res: Response) => {
   try {
-    const { 
-      categoryId, 
-      amount, 
-      description, 
-      expenseDate, 
-      reference, 
-      paymentMethod, 
-      status = 'PENDING' 
+    const {
+      categoryId,
+      amount,
+      description,
+      expenseDate,
+      reference,
+      paymentMethod,
+      status = 'PENDING'
     } = req.body;
 
     // Check if expense category exists
@@ -376,7 +376,7 @@ export const createExpense = async (req: Request, res: Response) => {
     // Generate expense number
     const today = new Date();
     const expenseNumber = `EXP-${today.getFullYear()}${(today.getMonth() + 1).toString().padStart(2, '0')}${today.getDate().toString().padStart(2, '0')}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
-    
+
     // Calculate tax amount (assuming 0 for now)
     const taxAmount = 0;
     const amountValue = parseFloat(amount as any);
@@ -395,7 +395,7 @@ export const createExpense = async (req: Request, res: Response) => {
         referenceNumber: reference,
         paymentMethod,
         status,
-        createdById: req.adminUser.id
+        createdById: req.staff?.id
       },
       include: {
         category: true
@@ -426,13 +426,13 @@ export const createExpense = async (req: Request, res: Response) => {
 export const updateExpense = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { 
-      categoryId, 
-      amount, 
-      description, 
-      expenseDate, 
-      reference, 
-      paymentMethod 
+    const {
+      categoryId,
+      amount,
+      description,
+      expenseDate,
+      reference,
+      paymentMethod
     } = req.body;
 
     // Check if expense exists
@@ -522,7 +522,7 @@ export const approveExpense = async (req: Request, res: Response) => {
       data: {
         status: 'APPROVED',
         rejectionReason: notes, // Using rejectionReason field for notes
-        approvedById: req.adminUser.id,
+        approvedById: req.staff?.id,
         approvedAt: new Date()
       },
       include: {
@@ -576,7 +576,7 @@ export const rejectExpense = async (req: Request, res: Response) => {
       data: {
         status: 'REJECTED',
         rejectionReason: notes,
-        approvedById: req.adminUser.id,
+        approvedById: req.staff?.id,
         approvedAt: new Date()
       },
       include: {

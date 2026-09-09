@@ -198,7 +198,7 @@ export const addTransactionToDayBook = async (req: Request, res: Response) => {
 			creditAccountId,
 		} = req.body;
 
-		const adminUserId = req.adminUser.id;
+		const adminUserId = req.staff?.id;
 
 		// Check if daybook exists and is not closed
 		const dayBook = await prisma.dayBook.findUnique({
@@ -355,7 +355,8 @@ export const addTransactionToDayBook = async (req: Request, res: Response) => {
 					select: {
 						id: true,
 						username: true,
-						fullName: true,
+						firstName: true,
+						lastName: true,
 					},
 				},
 			},
@@ -426,7 +427,7 @@ export const getDayBookTransactions = async (req: Request, res: Response) => {
 					select: {
 						id: true,
 						username: true,
-						fullName: true,
+						firstName: true, lastName: true,
 					},
 				},
 			},
@@ -507,11 +508,11 @@ export const deleteDayBookTransaction = async (req: Request, res: Response) => {
 			if (
 				transaction.transactionType === DayBookTransactionType.CASH_RECEIPT ||
 				transaction.transactionType ===
-					DayBookTransactionType.BANK_WITHDRAWAL ||
+				DayBookTransactionType.BANK_WITHDRAWAL ||
 				transaction.transactionType ===
-					DayBookTransactionType.LOAN_DISBURSEMENT ||
+				DayBookTransactionType.LOAN_DISBURSEMENT ||
 				transaction.transactionType ===
-					DayBookTransactionType.INTEREST_RECEIVED ||
+				DayBookTransactionType.INTEREST_RECEIVED ||
 				transaction.transactionType === DayBookTransactionType.FEE_RECEIVED ||
 				transaction.transactionType === DayBookTransactionType.OTHER_INCOME
 			) {

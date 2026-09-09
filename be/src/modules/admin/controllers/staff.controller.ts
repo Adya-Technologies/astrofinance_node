@@ -2,7 +2,7 @@ import { Request as ExpressRequest, Response } from 'express';
 
 // Extend the Express Request interface to include adminUser
 interface Request extends ExpressRequest {
-  adminUser?: {
+  staff?: {
     id: string;
     roles: Array<{ id: string; name: string }>;
     [key: string]: any;
@@ -114,19 +114,19 @@ export const getStaffById = async (req: Request, res: Response) => {
  */
 export const createStaff = async (req: Request, res: Response) => {
   try {
-    const { 
-      firstName, 
-      lastName, 
-      email, 
-      password, 
-      phone, 
-      address, 
-      dateOfBirth, 
-      joinDate, 
-      department, 
-      position, 
-      status = StaffStatus.ACTIVE, 
-      roleIds = [] 
+    const {
+      firstName,
+      lastName,
+      email,
+      password,
+      phone,
+      address,
+      dateOfBirth,
+      joinDate,
+      department,
+      position,
+      status = StaffStatus.ACTIVE,
+      roleIds = []
     } = req.body;
 
     // Check if email already exists
@@ -137,7 +137,7 @@ export const createStaff = async (req: Request, res: Response) => {
     if (existingStaffWithEmail) {
       throw new ApiError(409, `Email '${email}' is already registered`);
     }
-    
+
     // Generate a new employee ID
     // Format: STAFF001, STAFF002, etc.
     const latestStaff = await prisma.staff.findFirst({
@@ -145,9 +145,9 @@ export const createStaff = async (req: Request, res: Response) => {
         employeeId: 'desc'
       }
     });
-    
+
     let newEmployeeId = 'STAFF001';
-    
+
     if (latestStaff && latestStaff.employeeId) {
       // Extract the numeric part and increment it
       const match = latestStaff.employeeId.match(/STAFF(\d+)/);
@@ -158,10 +158,10 @@ export const createStaff = async (req: Request, res: Response) => {
         newEmployeeId = `STAFF${nextNumber.toString().padStart(3, '0')}`;
       }
     }
-    
+
     // Log the generated employee ID
     logger.info(`Generated new employee ID: ${newEmployeeId}`);
-    
+
     const employeeId = newEmployeeId;
 
     // Hash password if provided
@@ -275,16 +275,16 @@ export const createStaff = async (req: Request, res: Response) => {
 export const updateStaff = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { 
-      firstName, 
-      lastName, 
-      email, 
-      phone, 
-      address, 
-      department, 
-      position, 
-      status, 
-      roleIds 
+    const {
+      firstName,
+      lastName,
+      email,
+      phone,
+      address,
+      department,
+      position,
+      status,
+      roleIds
     } = req.body;
 
     // Check if staff exists
@@ -472,7 +472,7 @@ export const resetStaffPassword = async (req: Request, res: Response) => {
       AuditAction.PASSWORD_CHANGE,
       null,
       null,
-      { resetByAdmin: req.adminUser?.id || 'unknown' }
+      { resetByAdmin: req.staff?.id || 'unknown' }
     );
 
     return res.json({ message: 'Password reset successfully' });
@@ -552,7 +552,7 @@ export const deleteStaff = async (req: Request, res: Response) => {
       null
     );
 
-    return res.json({ 
+    return res.json({
       message: 'Staff member deleted successfully',
       id
     });

@@ -62,7 +62,8 @@ export const getAllDayBooks = async (req: Request, res: Response) => {
 					select: {
 						id: true,
 						username: true,
-						fullName: true,
+						firstName: true,
+						lastName: true,
 					},
 				},
 				transactions: {
@@ -118,7 +119,8 @@ export const getDayBookById = async (req: Request, res: Response) => {
 					select: {
 						id: true,
 						username: true,
-						fullName: true,
+						firstName: true,
+						lastName: true,
 					},
 				},
 				transactions: {
@@ -136,7 +138,7 @@ export const getDayBookById = async (req: Request, res: Response) => {
 							select: {
 								id: true,
 								username: true,
-								fullName: true,
+								firstName: true, lastName: true,
 							},
 						},
 					},
@@ -331,7 +333,7 @@ export const reconcileDayBook = async (req: Request, res: Response) => {
 export const closeDayBook = async (req: Request, res: Response) => {
 	try {
 		const { id } = req.params;
-		const adminUserId = req.adminUser.id;
+		const adminUserId = req.staff?.id;
 
 		// Check if day book exists
 		const existingDayBook = await prisma.dayBook.findUnique({

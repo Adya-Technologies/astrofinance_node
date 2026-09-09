@@ -281,7 +281,8 @@ export const getTransactionsByAccount = async (req: Request, res: Response) => {
 					select: {
 						id: true,
 						username: true,
-						fullName: true,
+						firstName: true,
+						lastName: true,
 					},
 				},
 			},
@@ -356,7 +357,8 @@ export const getTransactionById = async (req: Request, res: Response) => {
 					select: {
 						id: true,
 						username: true,
-						fullName: true,
+						firstName: true,
+						lastName: true,
 					},
 				},
 				journalEntry: true,

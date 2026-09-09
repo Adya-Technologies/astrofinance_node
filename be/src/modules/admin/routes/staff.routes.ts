@@ -2,7 +2,7 @@ import { Router, type Router as ExpressRouter, Request as ExpressRequest, Respon
 
 // Extend the Express Request interface to include adminUser
 interface Request extends ExpressRequest {
-  adminUser?: {
+  staff?: {
     id: string;
     roles: Array<{ id: string; name: string }>;
     [key: string]: any;
@@ -34,8 +34,8 @@ const isSuperAdmin = (req: Request, res: Response, next: NextFunction) => {
   // Check roles from the token first (if available)
   const tokenRoles = req.user?.roles || [];
 
-  // Then check roles from the adminUser object (from database)
-  const dbRoles = req.adminUser?.roles || [];
+  // Then check roles from the staff object (from database)
+  const dbRoles = req.staff?.roles || [];
   const dbRoleNames = dbRoles.map((role: any) => role.role?.name || role.name);
 
   // Check if either source has the Super Admin role

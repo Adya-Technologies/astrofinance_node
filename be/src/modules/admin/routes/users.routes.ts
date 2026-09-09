@@ -1,18 +1,18 @@
 import { Router, type Router as ExpressRouter } from 'express';
 import {
-  getAllAdminUsers,
-  getAdminUserById,
-  createAdminUser,
-  updateAdminUser,
-  resetAdminUserPassword
-} from '../controllers/admin-user.controller';
+  getAllUsers,
+  getUserById,
+  createUser,
+  updateUser,
+  resetUserPassword
+} from '../controllers/users.controller';
 import { authenticate, hasPermission } from '../../../common/middleware/auth.middleware';
 import { validate } from '../../../common/middleware/validation.middleware';
 import {
-  createAdminUserValidation,
-  updateAdminUserValidation,
+  createUserValidation,
+  updateUserValidation,
   resetPasswordValidation
-} from '../validations/admin-user.validation';
+} from '../validations/users.validation';
 
 const router: ExpressRouter = Router();
 
@@ -20,25 +20,25 @@ const router: ExpressRouter = Router();
 router.use(authenticate);
 
 // Get all admin users
-router.get('/', hasPermission('admin.view'), getAllAdminUsers);
+router.get('/', hasPermission('admin.view'), getAllUsers);
 
 // Get admin user by ID
-router.get('/:id', hasPermission('admin.view'), getAdminUserById);
+router.get('/:id', hasPermission('admin.view'), getUserById);
 
 // Create new admin user
 router.post(
   '/',
   hasPermission('admin.create'),
-  validate(createAdminUserValidation),
-  createAdminUser
+  validate(createUserValidation),
+  createUser
 );
 
 // Update admin user
 router.put(
   '/:id',
   hasPermission('admin.edit'),
-  validate(updateAdminUserValidation),
-  updateAdminUser
+  validate(updateUserValidation),
+  updateUser
 );
 
 // Reset admin user password
@@ -46,7 +46,7 @@ router.post(
   '/:id/reset-password',
   hasPermission('admin.edit'),
   validate(resetPasswordValidation),
-  resetAdminUserPassword
+  resetUserPassword
 );
 
 export default router;

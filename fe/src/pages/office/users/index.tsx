@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { PlusIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { EyeIcon, PencilIcon, KeyIcon, TrashIcon } from '@heroicons/react/24/outline';
 import MainLayout from '@/components/layout/MainLayout';
@@ -14,6 +15,7 @@ import { Column } from 'react-table';
 import { toast } from 'react-toastify';
 
 const UsersPage: React.FC = () => {
+  const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +72,7 @@ const UsersPage: React.FC = () => {
 
   const confirmDeleteUser = async () => {
     if (!userToDelete) return;
-    
+
     try {
       // This would be implemented with a delete API call
       // await deleteUser(userToDelete.id);
@@ -124,15 +126,15 @@ const UsersPage: React.FC = () => {
             row.original.userType === 'SB'
               ? 'blue'
               : row.original.userType === 'BB'
-              ? 'green'
-              : 'purple'
+                ? 'green'
+                : 'purple'
           }
           text={
             row.original.userType === 'SB'
               ? 'Savings Bank'
               : row.original.userType === 'BB'
-              ? 'Business Banking'
-              : 'Mobile Banking'
+                ? 'Business Banking'
+                : 'Mobile Banking'
           }
         />
       ),
@@ -179,36 +181,33 @@ const UsersPage: React.FC = () => {
       accessor: 'id' as keyof User,
       Cell: ({ row }: any) => (
         <div className="flex space-x-2">
-          <Link href={`/office/users/${row.original.id}`}>
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-blue-600 hover:text-blue-800"
-              title="View User"
-            >
-              <EyeIcon className="h-4 w-4" />
-            </Button>
-          </Link>
-          <Link href={`/office/users/${row.original.id}/edit`}>
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-green-600 hover:text-green-800"
-              title="Edit User"
-            >
-              <PencilIcon className="h-4 w-4" />
-            </Button>
-          </Link>
-          <Link href={`/office/users/${row.original.id}/reset-password`}>
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-yellow-600 hover:text-yellow-800"
-              title="Reset Password"
-            >
-              <KeyIcon className="h-4 w-4" />
-            </Button>
-          </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-blue-600 hover:text-blue-800"
+            title="View User"
+            onClick={() => router.push(`/office/users/${row.original.id}`)}
+          >
+            <EyeIcon className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-green-600 hover:text-green-800"
+            title="Edit User"
+            onClick={() => router.push(`/office/users/${row.original.id}/edit`)}
+          >
+            <PencilIcon className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-yellow-600 hover:text-yellow-800"
+            title="Reset Password"
+            onClick={() => router.push(`/office/users/${row.original.id}/reset-password`)}
+          >
+            <KeyIcon className="h-4 w-4" />
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -235,12 +234,14 @@ const UsersPage: React.FC = () => {
               </p>
             </div>
             <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
-              <Link href="/office/users/create">
-                <Button variant="primary" className="flex items-center">
-                  <PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-                  Add User
-                </Button>
-              </Link>
+              <Button
+                variant="primary"
+                className="flex items-center"
+                onClick={() => router.push('/office/users/create')}
+              >
+                <PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+                Add User
+              </Button>
             </div>
           </div>
 
@@ -325,7 +326,7 @@ const UsersPage: React.FC = () => {
             </div>
           </div>
         </div>
-        
+
         {/* Delete Confirmation Modal */}
         <Modal
           isOpen={showDeleteModal}
@@ -364,7 +365,7 @@ const UsersPage: React.FC = () => {
 export async function getServerSideProps({ locale }: { locale: string }) {
   return {
     props: {
-      ...(await import('next-i18next/serverSideTranslations').then(m => 
+      ...(await import('next-i18next/serverSideTranslations').then(m =>
         m.serverSideTranslations(locale, ['common', 'user', 'auth'])
       )),
     },

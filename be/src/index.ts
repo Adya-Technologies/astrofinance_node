@@ -29,6 +29,7 @@ import systemRoutes from "./modules/system/routes";
 import centerRoutes from "./modules/center/center.routes";
 import groupRoutes from "./modules/group/group.routes";
 import syncRoutes from "./modules/sync/sync.routes";
+import dashboardRoutes from "./modules/dashboard/dashboard.routes";
 
 // Create Express app
 const app: Express = express();
@@ -93,6 +94,7 @@ app.use("/api/system", systemRoutes);
 app.use("/api/centers", centerRoutes);
 app.use("/api/groups", groupRoutes);
 app.use("/api/sync", syncRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 // Error handling middleware
 app.use(notFound);

@@ -17,8 +17,8 @@ export const createAuditLog = async (
 ) => {
   try {
     // Get user information
-    const userId = req.adminUser?.id || req.user?.id;
-    const userName = req.adminUser?.username || req.user?.fullName || 'System';
+    const userId = req.staff?.id || req.user?.id;
+    const userName = (req.staff as any)?.username || req.staff?.email || req.user?.fullName || 'System';
 
     // Create audit log entry
     await prisma.auditLog.create({

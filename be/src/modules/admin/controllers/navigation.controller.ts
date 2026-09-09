@@ -526,7 +526,7 @@ export const getNavigationStructure = async (req: Request, res: Response) => {
  */
 export const getUserNavigation = async (req: Request, res: Response) => {
   try {
-    const adminUser = req.adminUser;
+    const adminUser = req.staff;
 
     // Get all role IDs for the user
     const roleIds = adminUser.roles.map((r: any) => r.roleId);

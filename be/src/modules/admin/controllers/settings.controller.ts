@@ -11,19 +11,19 @@ import { ApiError } from '../../../common/middleware/error.middleware';
 export const getAllSettings = async (req: Request, res: Response) => {
   try {
     const { category, search, page = '1', limit = '50' } = req.query;
-    
+
     // Parse pagination parameters
     const pageNumber = parseInt(page as string, 10);
     const limitNumber = parseInt(limit as string, 10);
     const skip = (pageNumber - 1) * limitNumber;
-    
+
     // Build filter conditions
     const where: any = {};
-    
+
     if (category) {
       where.category = category;
     }
-    
+
     if (search) {
       where.OR = [
         { key: { contains: search as string, mode: 'insensitive' } },
@@ -31,10 +31,10 @@ export const getAllSettings = async (req: Request, res: Response) => {
         { value: { contains: search as string, mode: 'insensitive' } }
       ];
     }
-    
+
     // Get total count for pagination
     const totalCount = await prisma.systemSetting.count({ where });
-    
+
     // Get settings with pagination
     const settings = await prisma.systemSetting.findMany({
       where,
@@ -43,7 +43,8 @@ export const getAllSettings = async (req: Request, res: Response) => {
           select: {
             id: true,
             username: true,
-            fullName: true
+            firstName: true,
+            lastName: true
           }
         }
       },
@@ -54,7 +55,7 @@ export const getAllSettings = async (req: Request, res: Response) => {
       skip,
       take: limitNumber
     });
-    
+
     return res.json({
       data: settings,
       pagination: {
@@ -76,7 +77,7 @@ export const getAllSettings = async (req: Request, res: Response) => {
 export const getSettingByKey = async (req: Request, res: Response) => {
   try {
     const { key } = req.params;
-    
+
     const setting = await prisma.systemSetting.findUnique({
       where: { key },
       include: {
@@ -84,16 +85,17 @@ export const getSettingByKey = async (req: Request, res: Response) => {
           select: {
             id: true,
             username: true,
-            fullName: true
+            firstName: true,
+            lastName: true
           }
         }
       }
     });
-    
+
     if (!setting) {
       throw new ApiError(404, 'Setting not found');
     }
-    
+
     return res.json(setting);
   } catch (error) {
     logger.error(`Get setting by key error: ${error}`);
@@ -107,37 +109,37 @@ export const getSettingByKey = async (req: Request, res: Response) => {
  */
 export const createSetting = async (req: Request, res: Response) => {
   try {
-    const { 
-      key, 
-      value, 
-      description, 
+    const {
+      key,
+      value,
+      description,
       category = 'GENERAL',
       isPublic = false,
       isEncrypted = false,
       dataType = 'STRING',
-      validation 
+      validation
     } = req.body;
-    
+
     // Check if setting already exists
     const existingSetting = await prisma.systemSetting.findUnique({
       where: { key }
     });
-    
+
     if (existingSetting) {
       throw new ApiError(400, 'Setting with this key already exists');
     }
-    
+
     // Validate data type
     const validDataTypes = ['STRING', 'NUMBER', 'BOOLEAN', 'JSON', 'DATE', 'EMAIL', 'URL', 'PHONE'];
     if (!validDataTypes.includes(dataType)) {
       throw new ApiError(400, 'Invalid data type');
     }
-    
+
     // Validate value based on data type
     if (!validateSettingValue(value, dataType)) {
       throw new ApiError(400, `Invalid value for data type ${dataType}`);
     }
-    
+
     // Create setting
     const setting = await prisma.systemSetting.create({
       data: {
@@ -156,12 +158,13 @@ export const createSetting = async (req: Request, res: Response) => {
           select: {
             id: true,
             username: true,
-            fullName: true
+            firstName: true,
+            lastName: true
           }
         }
       }
     });
-    
+
     // Create audit log
     await createAuditLog(
       req,
@@ -171,7 +174,7 @@ export const createSetting = async (req: Request, res: Response) => {
       null,
       setting
     );
-    
+
     return res.status(201).json(setting);
   } catch (error) {
     logger.error(`Create setting error: ${error}`);
@@ -186,25 +189,25 @@ export const createSetting = async (req: Request, res: Response) => {
 export const updateSetting = async (req: Request, res: Response) => {
   try {
     const { key } = req.params;
-    const { 
-      value, 
-      description, 
+    const {
+      value,
+      description,
       category,
       isPublic,
       isEncrypted,
       dataType,
-      validation 
+      validation
     } = req.body;
-    
+
     // Check if setting exists
     const existingSetting = await prisma.systemSetting.findUnique({
       where: { key }
     });
-    
+
     if (!existingSetting) {
       throw new ApiError(404, 'Setting not found');
     }
-    
+
     // Validate data type if provided
     if (dataType) {
       const validDataTypes = ['STRING', 'NUMBER', 'BOOLEAN', 'JSON', 'DATE', 'EMAIL', 'URL', 'PHONE'];
@@ -212,7 +215,7 @@ export const updateSetting = async (req: Request, res: Response) => {
         throw new ApiError(400, 'Invalid data type');
       }
     }
-    
+
     // Validate value if provided
     if (value !== undefined) {
       const currentDataType = dataType || existingSetting.dataType;
@@ -220,12 +223,12 @@ export const updateSetting = async (req: Request, res: Response) => {
         throw new ApiError(400, `Invalid value for data type ${currentDataType}`);
       }
     }
-    
+
     // Prepare update data
     const updateData: any = {};
     if (value !== undefined) {
-      updateData.value = (isEncrypted !== undefined ? isEncrypted : existingSetting.isEncrypted) 
-        ? encryptValue(value) 
+      updateData.value = (isEncrypted !== undefined ? isEncrypted : existingSetting.isEncrypted)
+        ? encryptValue(value)
         : value;
     }
     if (description !== undefined) updateData.description = description;
@@ -235,7 +238,7 @@ export const updateSetting = async (req: Request, res: Response) => {
     if (dataType !== undefined) updateData.dataType = dataType;
     if (validation !== undefined) updateData.validation = validation;
     updateData.updatedById = req.user?.id;
-    
+
     // Update setting
     const updatedSetting = await prisma.systemSetting.update({
       where: { key },
@@ -245,12 +248,13 @@ export const updateSetting = async (req: Request, res: Response) => {
           select: {
             id: true,
             username: true,
-            fullName: true
+            firstName: true,
+            lastName: true
           }
         }
       }
     });
-    
+
     // Create audit log
     await createAuditLog(
       req,
@@ -260,7 +264,7 @@ export const updateSetting = async (req: Request, res: Response) => {
       existingSetting,
       updatedSetting
     );
-    
+
     return res.json(updatedSetting);
   } catch (error) {
     logger.error(`Update setting error: ${error}`);
@@ -275,21 +279,21 @@ export const updateSetting = async (req: Request, res: Response) => {
 export const deleteSetting = async (req: Request, res: Response) => {
   try {
     const { key } = req.params;
-    
+
     // Check if setting exists
     const existingSetting = await prisma.systemSetting.findUnique({
       where: { key }
     });
-    
+
     if (!existingSetting) {
       throw new ApiError(404, 'Setting not found');
     }
-    
+
     // Delete setting
     await prisma.systemSetting.delete({
       where: { key }
     });
-    
+
     // Create audit log
     await createAuditLog(
       req,
@@ -299,7 +303,7 @@ export const deleteSetting = async (req: Request, res: Response) => {
       existingSetting,
       null
     );
-    
+
     return res.json({ message: 'Setting deleted successfully' });
   } catch (error) {
     logger.error(`Delete setting error: ${error}`);
@@ -317,7 +321,7 @@ export const getSettingCategories = async (req: Request, res: Response) => {
       where: { isActive: true },
       orderBy: { order: 'asc' }
     });
-    
+
     return res.json(categories);
   } catch (error) {
     logger.error('Get setting categories error:', error);
@@ -331,12 +335,12 @@ export const getSettingCategories = async (req: Request, res: Response) => {
 export const getPublicSettings = async (req: Request, res: Response) => {
   try {
     const { category } = req.query;
-    
+
     const where: any = { isPublic: true };
     if (category) {
       where.category = category;
     }
-    
+
     const settings = await prisma.systemSetting.findMany({
       where,
       select: {
@@ -350,7 +354,7 @@ export const getPublicSettings = async (req: Request, res: Response) => {
         { key: 'asc' }
       ]
     });
-    
+
     return res.json(settings);
   } catch (error) {
     logger.error('Get public settings error:', error);
@@ -364,37 +368,37 @@ export const getPublicSettings = async (req: Request, res: Response) => {
 export const bulkUpdateSettings = async (req: Request, res: Response) => {
   try {
     const { settings } = req.body;
-    
+
     if (!Array.isArray(settings)) {
       throw new ApiError(400, 'Settings must be an array');
     }
-    
+
     const results = [];
-    
+
     for (const settingData of settings) {
       const { key, value, description } = settingData;
-      
+
       if (!key) {
         results.push({ key, success: false, error: 'Key is required' });
         continue;
       }
-      
+
       try {
         const existingSetting = await prisma.systemSetting.findUnique({
           where: { key }
         });
-        
+
         if (!existingSetting) {
           results.push({ key, success: false, error: 'Setting not found' });
           continue;
         }
-        
+
         // Validate value
         if (value !== undefined && !validateSettingValue(value, existingSetting.dataType)) {
           results.push({ key, success: false, error: `Invalid value for data type ${existingSetting.dataType}` });
           continue;
         }
-        
+
         // Update setting
         const updatedSetting = await prisma.systemSetting.update({
           where: { key },
@@ -404,7 +408,7 @@ export const bulkUpdateSettings = async (req: Request, res: Response) => {
             updatedById: req.user?.id
           }
         });
-        
+
         // Create audit log
         await createAuditLog(
           req,
@@ -414,13 +418,13 @@ export const bulkUpdateSettings = async (req: Request, res: Response) => {
           existingSetting,
           updatedSetting
         );
-        
+
         results.push({ key, success: true });
       } catch (error) {
         results.push({ key, success: false, error: error instanceof Error ? error.message : 'Unknown error' });
       }
     }
-    
+
     return res.json({ results });
   } catch (error) {
     logger.error(`Bulk update settings error: ${error}`);
@@ -435,11 +439,11 @@ export const bulkUpdateSettings = async (req: Request, res: Response) => {
 export const getSettingAuditLogs = async (req: Request, res: Response) => {
   try {
     const { key, page = '1', limit = '20' } = req.query;
-    
+
     const pageNumber = parseInt(page as string, 10);
     const limitNumber = parseInt(limit as string, 10);
     const skip = (pageNumber - 1) * limitNumber;
-    
+
     const where: any = {};
     if (key) {
       const keyString = key as string;
@@ -448,9 +452,9 @@ export const getSettingAuditLogs = async (req: Request, res: Response) => {
         where.settingId = setting.id;
       }
     }
-    
+
     const totalCount = await prisma.settingAuditLog.count({ where });
-    
+
     const auditLogs = await prisma.settingAuditLog.findMany({
       where,
       include: {
@@ -464,7 +468,8 @@ export const getSettingAuditLogs = async (req: Request, res: Response) => {
           select: {
             id: true,
             username: true,
-            fullName: true
+            firstName: true,
+            lastName: true
           }
         }
       },
@@ -472,7 +477,7 @@ export const getSettingAuditLogs = async (req: Request, res: Response) => {
       skip,
       take: limitNumber
     });
-    
+
     return res.json({
       data: auditLogs,
       pagination: {

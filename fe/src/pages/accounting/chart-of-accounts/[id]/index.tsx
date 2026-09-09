@@ -12,7 +12,7 @@ import chartOfAccountsService, { Account } from '../../../../services/chart-of-a
 const AccountDetailPage: React.FC = () => {
   const router = useRouter();
   const { id } = router.query;
-  
+
   const [account, setAccount] = useState<Account | null>(null);
   const [parentAccount, setParentAccount] = useState<Account | null>(null);
   const [childAccounts, setChildAccounts] = useState<Account[]>([]);
@@ -29,7 +29,7 @@ const AccountDetailPage: React.FC = () => {
     try {
       const accountData = await chartOfAccountsService.getAccountById(accountId);
       setAccount(accountData);
-      
+
       // Fetch parent account if exists
       if (accountData.parentId) {
         try {
@@ -39,7 +39,7 @@ const AccountDetailPage: React.FC = () => {
           console.error('Error fetching parent account:', error);
         }
       }
-      
+
       // Fetch child accounts
       try {
         const allAccounts = await chartOfAccountsService.getAllAccounts();
@@ -125,12 +125,14 @@ const AccountDetailPage: React.FC = () => {
                 Account Details
               </h1>
             </div>
-            <Link href={`/accounting/chart-of-accounts/${account.id}/edit`} passHref>
-              <Button variant="primary" className="flex items-center">
-                <PencilIcon className="h-5 w-5 mr-1" />
-                Edit Account
-              </Button>
-            </Link>
+            <Button
+              variant="primary"
+              className="flex items-center"
+              onClick={() => router.push(`/accounting/chart-of-accounts/${account.id}/edit`)}
+            >
+              <PencilIcon className="h-5 w-5 mr-1" />
+              Edit Account
+            </Button>
           </div>
 
           <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
@@ -166,10 +168,11 @@ const AccountDetailPage: React.FC = () => {
                   <dt className="text-sm font-medium text-gray-500">Parent Account</dt>
                   <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                     {parentAccount ? (
-                      <Link href={`/accounting/chart-of-accounts/${parentAccount.id}`}>
-                        <a className="text-indigo-600 hover:text-indigo-900">
-                          {parentAccount.accountCode} - {parentAccount.name}
-                        </a>
+                      <Link
+                        href={`/accounting/chart-of-accounts/${parentAccount.id}`}
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
+                        {parentAccount.accountCode} - {parentAccount.name}
                       </Link>
                     ) : (
                       'None (Top Level Account)'
@@ -265,8 +268,11 @@ const AccountDetailPage: React.FC = () => {
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <Link href={`/accounting/chart-of-accounts/${child.id}`}>
-                            <a className="text-indigo-600 hover:text-indigo-900">View</a>
+                          <Link
+                            href={`/accounting/chart-of-accounts/${child.id}`}
+                            className="text-indigo-600 hover:text-indigo-900"
+                          >
+                            View
                           </Link>
                         </td>
                       </tr>
@@ -287,7 +293,7 @@ const AccountDetailPage: React.FC = () => {
 export async function getServerSideProps({ locale }: { locale: string }) {
   return {
     props: {
-      ...(await import('next-i18next/serverSideTranslations').then(m => 
+      ...(await import('next-i18next/serverSideTranslations').then(m =>
         m.serverSideTranslations(locale, ['common', 'user', 'auth'])
       )),
     },

@@ -11,22 +11,22 @@ import { generateJournalEntryNumber } from '../utils/accounting.utils';
  */
 export const getAllJournalEntries = async (req: Request, res: Response) => {
   try {
-    const { 
-      startDate, 
-      endDate, 
-      status, 
-      page = '1', 
-      limit = '10' 
+    const {
+      startDate,
+      endDate,
+      status,
+      page = '1',
+      limit = '10'
     } = req.query;
-    
+
     // Parse pagination parameters
     const pageNumber = parseInt(page as string, 10);
     const limitNumber = parseInt(limit as string, 10);
     const skip = (pageNumber - 1) * limitNumber;
-    
+
     // Build filter conditions
     const where: any = {};
-    
+
     if (startDate && endDate) {
       where.entryDate = {
         gte: new Date(startDate as string),
@@ -41,14 +41,14 @@ export const getAllJournalEntries = async (req: Request, res: Response) => {
         lte: new Date(endDate as string)
       };
     }
-    
+
     if (status) {
       where.status = status;
     }
-    
+
     // Get total count for pagination
     const totalCount = await prisma.journalEntry.count({ where });
-    
+
     // Get journal entries with pagination
     const journalEntries = await prisma.journalEntry.findMany({
       where,
@@ -57,14 +57,15 @@ export const getAllJournalEntries = async (req: Request, res: Response) => {
           select: {
             id: true,
             username: true,
-            fullName: true
+            firstName: true,
+            lastName: true
           }
         },
         approvedBy: {
           select: {
             id: true,
             username: true,
-            fullName: true
+            firstName: true, lastName: true
           }
         },
         journalEntryLines: true
@@ -75,7 +76,7 @@ export const getAllJournalEntries = async (req: Request, res: Response) => {
       skip,
       take: limitNumber
     });
-    
+
     return res.status(200).json({
       success: true,
       message: 'Journal entries retrieved successfully',
@@ -112,14 +113,14 @@ export const getJournalEntryById = async (req: Request, res: Response) => {
           select: {
             id: true,
             username: true,
-            fullName: true
+            firstName: true, lastName: true
           }
         },
         approvedBy: {
           select: {
             id: true,
             username: true,
-            fullName: true
+            firstName: true, lastName: true
           }
         }
       }
@@ -146,14 +147,14 @@ export const getJournalEntryById = async (req: Request, res: Response) => {
  */
 export const createJournalEntry = async (req: Request, res: Response) => {
   try {
-    const { 
-      entryDate, 
-      reference, 
-      description, 
-      debitEntries, 
-      creditEntries 
+    const {
+      entryDate,
+      reference,
+      description,
+      debitEntries,
+      creditEntries
     } = req.body;
-    const adminUserId = req.adminUser.id;
+    const adminUserId = req.staff?.id;
 
     // Validate debit and credit entries
     if (!Array.isArray(debitEntries) || debitEntries.length === 0) {
@@ -272,7 +273,7 @@ export const createJournalEntry = async (req: Request, res: Response) => {
           select: {
             id: true,
             username: true,
-            fullName: true
+            firstName: true, lastName: true
           }
         }
       }
@@ -297,7 +298,7 @@ export const updateJournalEntryStatus = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { status, rejectionReason } = req.body;
-    const adminUserId = req.adminUser.id;
+    const adminUserId = req.staff?.id;
 
     // Check if journal entry exists
     const existingJournalEntry = await prisma.journalEntry.findUnique({

@@ -122,11 +122,13 @@ const UserDetailPage: React.FC = () => {
       Header: 'Actions',
       accessor: 'id',
       Cell: ({ value }: { value: string }) => (
-        <Link href={`/loans/${value}`}>
-          <Button variant="outline" size="sm">
-            View Details
-          </Button>
-        </Link>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => router.push(`/loans/${value}`)}
+        >
+          View Details
+        </Button>
       ),
     },
   ];
@@ -171,11 +173,13 @@ const UserDetailPage: React.FC = () => {
       Header: 'Actions',
       accessor: 'id',
       Cell: ({ value }: { value: string }) => (
-        <Link href={`/loan-applications/${value}`}>
-          <Button variant="outline" size="sm">
-            View Details
-          </Button>
-        </Link>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => router.push(`/loan-applications/${value}`)}
+        >
+          View Details
+        </Button>
       ),
     },
   ];
@@ -193,12 +197,14 @@ const UserDetailPage: React.FC = () => {
       <MainLayout>
         <div className="px-4 sm:px-6 lg:px-8 py-8">
           <div className="mb-6">
-            <Link href="/users">
-              <Button variant="outline" className="flex items-center">
-                <ArrowLeftIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-                Back to Users List
-              </Button>
-            </Link>
+            <Button
+              variant="outline"
+              className="flex items-center"
+              onClick={() => router.push('/users')}
+            >
+              <ArrowLeftIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+              Back to Users List
+            </Button>
           </div>
 
           {error && (
@@ -232,12 +238,14 @@ const UserDetailPage: React.FC = () => {
                     </p>
                   </div>
                   <div className="flex space-x-2">
-                    <Link href={`/users/${user.id}/edit`}>
-                      <Button variant="outline" className="flex items-center">
-                        <PencilIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-                        Edit
-                      </Button>
-                    </Link>
+                    <Button
+                      variant="outline"
+                      className="flex items-center"
+                      onClick={() => router.push(`/users/${user.id}/edit`)}
+                    >
+                      <PencilIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+                      Edit
+                    </Button>
                   </div>
                 </div>
 

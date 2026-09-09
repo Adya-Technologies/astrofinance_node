@@ -9,8 +9,8 @@ interface ProtectedRouteProps {
   allowedUserTypes?: ('ADMIN' | 'STAFF' | 'USER')[];
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
-  children, 
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+  children,
   adminOnly = false,
   staffOnly = false,
   allowedUserTypes
@@ -23,10 +23,14 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       if (!isAuthenticated) {
         router.push('/login');
       } else if (adminOnly && !isAdmin) {
-        // Admin-only route, redirect non-admins
-        router.push('/dashboard');
+        // Admin-only route, redirect non-admins to their dashboard
+        if (isStaff) {
+          router.push('/staff/dashboard');
+        } else {
+          router.push('/dashboard');
+        }
       } else if (staffOnly && !isStaff && !isAdmin) {
-        // Staff-only route, redirect non-staff (admins can access staff routes)
+        // Staff-only route, redirect non-staff
         router.push('/dashboard');
       } else if (allowedUserTypes && userType && !allowedUserTypes.includes(userType)) {
         // Route with specific allowed user types
@@ -41,10 +45,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     }
   }, [isAuthenticated, isAdmin, isStaff, userType, isLoading, adminOnly, staffOnly, allowedUserTypes, router]);
 
-  if (isLoading || !isAuthenticated || 
-      (adminOnly && !isAdmin) || 
-      (staffOnly && !isStaff && !isAdmin) ||
-      (allowedUserTypes && userType && !allowedUserTypes.includes(userType))) {
+  if (isLoading || !isAuthenticated ||
+    (adminOnly && !isAdmin) ||
+    (staffOnly && !isStaff && !isAdmin) ||
+    (allowedUserTypes && userType && !allowedUserTypes.includes(userType))) {
     return (
       <div className="flex justify-center items-center h-screen">
         <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-primary-500"></div>

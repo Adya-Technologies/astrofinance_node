@@ -7,6 +7,7 @@ import {
 	TrashIcon,
 } from "@heroicons/react/24/outline";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import type React from "react";
 import { useEffect, useState } from "react";
 import type { Column } from "react-table";
@@ -22,6 +23,7 @@ import { formatDate } from "@/utils/dateUtils";
 import { useTranslation } from 'next-i18next';
 
 const UsersPage: React.FC = () => {
+	const router = useRouter();
 	const { t } = useTranslation('common');
 	const [users, setUsers] = useState<User[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -155,40 +157,40 @@ const UsersPage: React.FC = () => {
 		{
 			Header: t('table.actions'),
 			accessor: "id" as keyof User,
-			Cell: ({ row }: any) => (
-				<div className="flex space-x-2">
-					<Link href={`/users/${row.original.id}`}>
+			Cell: ({ row }: any) => {
+				return (
+					<div className="flex space-x-2">
 						<Button
 							variant="outline"
 							size="sm"
 							className="text-blue-600 hover:text-blue-800"
 							title="View User"
+							onClick={() => router.push(`/users/${row.original.id}`)}
 						>
 							<EyeIcon className="h-4 w-4" />
 						</Button>
-					</Link>
-					<Link href={`/users/${row.original.id}/edit`}>
 						<Button
 							variant="outline"
 							size="sm"
 							className="text-green-600 hover:text-green-800"
 							title="Edit User"
+							onClick={() => router.push(`/users/${row.original.id}/edit`)}
 						>
 							<PencilIcon className="h-4 w-4" />
 						</Button>
-					</Link>
 
-					<Button
-						variant="outline"
-						size="sm"
-						className="text-red-600 hover:text-red-800"
-						title="Delete User"
-						onClick={() => handleDeleteUser(row.original)}
-					>
-						<TrashIcon className="h-4 w-4" />
-					</Button>
-				</div>
-			),
+						<Button
+							variant="outline"
+							size="sm"
+							className="text-red-600 hover:text-red-800"
+							title="Delete User"
+							onClick={() => handleDeleteUser(row.original)}
+						>
+							<TrashIcon className="h-4 w-4" />
+						</Button>
+					</div>
+				);
+			},
 		},
 	];
 
@@ -204,12 +206,14 @@ const UsersPage: React.FC = () => {
 							</p>
 						</div>
 						<div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
-							<Link href="/users/create">
-								<Button variant="primary" className="flex items-center">
-									<PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-									{t('actions.add_user')}
-								</Button>
-							</Link>
+							<Button
+								variant="primary"
+								className="flex items-center"
+								onClick={() => router.push('/users/create')}
+							>
+								<PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+								{t('actions.add_user')}
+							</Button>
 						</div>
 					</div>
 

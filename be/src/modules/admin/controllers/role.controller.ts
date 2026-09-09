@@ -15,7 +15,7 @@ export const getAllRoles = async (req: Request, res: Response) => {
         _count: {
           select: {
             permissions: true,
-            adminUsers: true
+            staffRoles: true
           }
         }
       },
@@ -51,13 +51,14 @@ export const getRoleById = async (req: Request, res: Response) => {
             navigationItem: true
           }
         },
-        adminUsers: {
+        staffRoles: {
           include: {
-            adminUser: {
+            staff: {
               select: {
                 id: true,
                 username: true,
-                fullName: true,
+                firstName: true,
+                lastName: true,
                 email: true
               }
             }
@@ -139,7 +140,7 @@ export const updateRole = async (req: Request, res: Response) => {
     }
 
     // Check if system role
-    if (existingRole.isSystem && req.adminUser.username !== 'admin') {
+    if (existingRole.isSystem && (req.staff as any)?.username !== 'admin') {
       throw new ApiError(403, 'System roles can only be modified by super admin');
     }
 
@@ -197,7 +198,7 @@ export const deleteRole = async (req: Request, res: Response) => {
       include: {
         _count: {
           select: {
-            adminUsers: true
+            staffRoles: true
           }
         }
       }
@@ -213,7 +214,7 @@ export const deleteRole = async (req: Request, res: Response) => {
     }
 
     // Check if role is assigned to users
-    if (existingRole._count.adminUsers > 0) {
+    if (existingRole._count.staffRoles > 0) {
       throw new ApiError(400, 'Cannot delete role that is assigned to users');
     }
 
@@ -255,7 +256,7 @@ export const updateRolePermissions = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { permissionIds } = req.body;
-    console.log(permissionIds," this is permissionIds");
+    console.log(permissionIds, " this is permissionIds");
     if (!Array.isArray(permissionIds)) {
       throw new ApiError(400, 'permissionIds must be an array');
     }
@@ -322,7 +323,7 @@ export const updateRolePermissions = async (req: Request, res: Response) => {
         }
       }
     });
-    
+
     // Create audit log
     await createAuditLog(
       req,

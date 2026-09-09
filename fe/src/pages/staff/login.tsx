@@ -179,25 +179,23 @@ const StaffLogin = () => {
             </div>
 
             <div className="mt-6 grid grid-cols-1 gap-3">
-              <Link href="/login" className="w-full">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                >
-                  User Login
-                </Button>
-              </Link>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => window.location.href = '/login'}
+              >
+                User Login
+              </Button>
 
-              <Link href="/admin/login" className="w-full">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                >
-                  Admin Login
-                </Button>
-              </Link>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => window.location.href = '/admin/login'}
+              >
+                Admin Login
+              </Button>
             </div>
           </div>
         </div>

@@ -13,8 +13,7 @@ declare global {
         userType: 'ADMIN' | 'STAFF' | 'USER';
         [key: string]: any;
       };
-      adminUser?: any;
-      staff?: any;
+      staff?: any; // Replaces adminUser
     }
   }
 }
@@ -22,6 +21,9 @@ declare global {
 // JWT secret from environment variables
 const JWT_SECRET = process.env.JWT_SECRET as string;
 
+/**
+ * Middleware to authenticate admin users
+ */
 /**
  * Middleware to authenticate admin users
  */
@@ -34,12 +36,12 @@ export const authenticateAdmin = async (req: Request, res: Response, next: NextF
     }
 
     const token = authHeader.split(' ')[1];
-    
+
     // Verify token
     const decoded: any = jwt.verify(token, JWT_SECRET);
-    
-    // Check if admin user exists and is active
-    const adminUser = await prisma.adminUser.findUnique({
+
+    // Check if staff exists and is active (Replacing AdminUser with Staff)
+    const staff = await prisma.staff.findUnique({
       where: { id: decoded.id },
       include: {
         roles: {
@@ -58,27 +60,28 @@ export const authenticateAdmin = async (req: Request, res: Response, next: NextF
       }
     });
 
-    if (!adminUser) {
+    if (!staff) {
       return res.status(401).json({ message: 'User not found' });
     }
 
-    if (!adminUser.isActive) {
+    if (staff.status !== 'ACTIVE') {
       return res.status(403).json({ message: 'User account is inactive' });
     }
 
-    // Attach admin user to request object
-    req.adminUser = adminUser;
-    
+    // Check if staff has admin privileges (optional, depending on requirements. For now, assuming successful login implies access)
+
+    // Attach staff to request object.
+    req.staff = staff;
+
     // Also attach to unified user object for consistency
     req.user = {
-      id: adminUser.id,
-      email: adminUser.email,
+      id: staff.id,
+      email: staff.email,
       userType: 'ADMIN',
-      username: adminUser.username,
-      fullName: adminUser.fullName,
-      roles: adminUser.roles.map((r: any) => r.role?.name || r.name)
+      fullName: `${staff.firstName} ${staff.lastName}`,
+      roles: staff.roles.map((r: any) => r.role?.name || r.name)
     };
-    
+
     next();
   } catch (error) {
     logger.error('Authentication error:', error);
@@ -98,10 +101,10 @@ export const authenticateUser = async (req: Request, res: Response, next: NextFu
     }
 
     const token = authHeader.split(' ')[1];
-    
+
     // Verify token
     const decoded: any = jwt.verify(token, JWT_SECRET);
-    
+
     // Check if user exists and is active
     const user = await prisma.user.findUnique({
       where: { id: decoded.id }
@@ -116,14 +119,12 @@ export const authenticateUser = async (req: Request, res: Response, next: NextFu
     }
 
     // Attach user to request object
-    // Attach user to request object
-req.user = {
-  id: user.id,
-  email: user.email || '',  // Convert null to empty string
-  userType: 'USER',
-  // Include any other properties you need
-  fullName: user.fullName
-};
+    req.user = {
+      id: user.id,
+      email: user.email || '',
+      userType: 'USER',
+      fullName: user.fullName
+    };
 
     next();
   } catch (error) {
@@ -144,10 +145,10 @@ export const authenticateStaff = async (req: Request, res: Response, next: NextF
     }
 
     const token = authHeader.split(' ')[1];
-    
+
     // Verify token
     const decoded: any = jwt.verify(token, JWT_SECRET);
-    
+
     // Check if staff exists and is active
     const staff = await prisma.staff.findUnique({
       where: { id: decoded.id },
@@ -178,7 +179,7 @@ export const authenticateStaff = async (req: Request, res: Response, next: NextF
 
     // Attach staff to request object
     req.staff = staff;
-    
+
     next();
   } catch (error) {
     logger.error('Authentication error:', error);
@@ -198,56 +199,15 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     }
 
     const token = authHeader.split(' ')[1];
-    
+
     // Verify token
     const decoded: any = jwt.verify(token, JWT_SECRET);
-    
+
     // Check user type from token
     const userType = decoded.userType;
-    
-    if (userType === 'ADMIN') {
-      // Check if admin user exists and is active
-      const adminUser = await prisma.adminUser.findUnique({
-        where: { id: decoded.id },
-        include: {
-          roles: {
-            include: {
-              role: {
-                include: {
-                  permissions: {
-                    include: {
-                      permission: true
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      });
 
-      if (!adminUser) {
-        return res.status(401).json({ message: 'User not found' });
-      }
-
-      if (!adminUser.isActive) {
-        return res.status(403).json({ message: 'User account is inactive' });
-      }
-
-      // Attach admin user to request object
-      req.adminUser = adminUser;
-      
-      // Also attach to unified user object
-      req.user = {
-        id: adminUser.id,
-        email: adminUser.email,
-        userType: 'ADMIN',
-        username: adminUser.username,
-        fullName: adminUser.fullName,
-        roles: adminUser.roles
-      };
-    } else if (userType === 'STAFF') {
-      // Check if staff exists and is active
+    if (userType === 'ADMIN' || userType === 'STAFF') {
+      // Both ADMIN and STAFF now map to Staff table
       const staff = await prisma.staff.findUnique({
         where: { id: decoded.id },
         include: {
@@ -277,13 +237,12 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
 
       // Attach staff to request object
       req.staff = staff;
-      
+
       // Also attach to unified user object
       req.user = {
         id: staff.id,
         email: staff.email,
-        userType: 'STAFF',
-        employeeId: staff.employeeId,
+        userType: userType as 'ADMIN' | 'STAFF' | 'USER',
         fullName: `${staff.firstName} ${staff.lastName}`,
         roles: staff.roles
       };
@@ -311,7 +270,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     } else {
       return res.status(401).json({ message: 'Invalid user type' });
     }
-    
+
     next();
   } catch (error) {
     logger.error('Authentication error:', error);
@@ -336,9 +295,9 @@ export const hasPermission = (requiredPermission: string) => {
 
     // Extract permissions from user roles
     const userPermissions = new Set<string>();
-    
-    if (req.user.userType === 'ADMIN' && req.adminUser) {
-      req.adminUser.roles.forEach((roleAssignment: any) => {
+
+    if (req.user.userType === 'ADMIN' && req.staff) {
+      req.staff.roles.forEach((roleAssignment: any) => {
         roleAssignment.role.permissions.forEach((permissionAssignment: any) => {
           userPermissions.add(permissionAssignment.permission.code);
         });

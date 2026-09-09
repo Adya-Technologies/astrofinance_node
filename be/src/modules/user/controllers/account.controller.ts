@@ -133,9 +133,11 @@ export const createAccount = async (req: Request, res: Response) => {
 			throw new ApiError(404, `User with ID ${userId} not found`);
 		}
 
-		// Validate account type exists
+		// Validate account type exists (by ID or Code)
+		const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(accountType);
+
 		const accountTypeConfig = await prisma.accountTypeConfig.findUnique({
-			where: { id: accountType },
+			where: isUuid ? { id: accountType } : { code: accountType },
 		});
 
 		if (!accountTypeConfig) {

@@ -13,7 +13,7 @@ type SyncLog = {
     timestamp: string;
     stats: {
         session: { status: 'ADDED' | 'SKIPPED' | 'PENDING' };
-        entries: { added: number; skipped: number };
+        entries: { added: number; skipped: number; transactionsCreated?: number };
         attendance: { added: number; skipped: number };
     };
 };
@@ -148,7 +148,7 @@ const SyncPage = () => {
                                             {new Date(log.timestamp).toLocaleString()}
                                         </span>
                                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${log.stats.session.status === 'ADDED' ? 'bg-green-100 text-green-700' :
-                                                log.stats.session.status === 'SKIPPED' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100'
+                                            log.stats.session.status === 'SKIPPED' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100'
                                             }`}>
                                             {log.stats.session.status === 'ADDED' ? 'Success' : 'Duplicate'}
                                         </span>
@@ -168,6 +168,14 @@ const SyncPage = () => {
                                                 <span className="text-yellow-600"> {log.stats.attendance.skipped} skip</span>
                                             </span>
                                         </div>
+                                        {log.stats.entries.transactionsCreated !== undefined && (
+                                            <div className="flex justify-between mt-1 pt-1 border-t border-gray-100">
+                                                <span className="font-medium">💰 Transactions:</span>
+                                                <span className="text-blue-600 font-bold">
+                                                    {log.stats.entries.transactionsCreated} Posted
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ))}

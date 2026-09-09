@@ -7,48 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model AdminUser {
-  id                         String                   @id @default(uuid())
-  username                   String                   @unique
-  email                      String                   @unique
-  passwordHash               String
-  fullName                   String
-  isActive                   Boolean                  @default(true)
-  lastLogin                  DateTime?
-  failedLoginAttempts        Int                      @default(0)
-  passwordChangedAt          DateTime?
-  passwordResetToken         String?
-  passwordResetExpires       DateTime?
-  twoFactorEnabled           Boolean                  @default(false)
-  twoFactorSecret            String?
-  createdAt                  DateTime                 @default(now())
-  updatedAt                  DateTime                 @updatedAt
-  roles                      AdminUserRole[]
-  approvedBudgets            Budget[]                 @relation("ApprovedByAdmin")
-  createdBudgets             Budget[]                 @relation("CreatedByAdmin")
-  closedDayBooks             DayBook[]                @relation("ClosedByAdmin")
-  createdDayBookTransactions DayBookTransaction[]     @relation("CreatedDayBookTransaction")
-  approvedJournalEntries     JournalEntry[]           @relation("ApprovedByAdmin")
-  createdJournalEntries      JournalEntry[]           @relation("CreatedByAdmin")
-  approvedLoans              LoanApplication[]        @relation("ApprovedByAdmin")
-  verifiedDocuments          LoanDocument[]           @relation("VerifiedByAdmin")
-  receivedPayments           LoanPayment[]            @relation("ReceivedByAdmin")
-  createdReports             ReportTemplate[]         @relation("CreatedByAdmin")
-  settingChanges             SettingAuditLog[]        @relation("ChangedByAdmin")
-  updatedSettings            SystemSetting[]          @relation("UpdatedByAdmin")
-  generatedCertificates      TaxCertificate[]         @relation("GeneratedByAdmin")
-  verifiedExemptions         TdsExemption[]           @relation("VerifiedByAdmin")
-  generatedStatements        UserAccountStatement[]   @relation("GeneratedByAdmin")
-  performedTransactions      UserAccountTransaction[] @relation("PerformedByAdmin")
-  createdUserAccounts        UserAccount[]            @relation("CreatedUserAccount")
-  createdShareTransactions   ShareTransaction[]       @relation("CreatedShareTransaction")
-  issuedShareCertificates    ShareCertificate[]       @relation("IssuedShareCertificate")
 
-  @@index([username])
-  @@index([email])
-  @@index([isActive])
-  @@map("admin_users")
-}
 
 model Role {
   id             String           @id @default(uuid())
@@ -57,7 +16,7 @@ model Role {
   isSystem       Boolean          @default(false)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
-  adminUsers     AdminUserRole[]
+
   approvalLevels ApprovalLevel[]
   navigation     RoleNavigation[]
   permissions    RolePermission[]
@@ -91,17 +50,7 @@ model RolePermission {
   @@map("role_permissions")
 }
 
-model AdminUserRole {
-  id          String    @id @default(uuid())
-  adminUserId String
-  roleId      String
-  createdAt   DateTime  @default(now())
-  adminUser   AdminUser @relation(fields: [adminUserId], references: [id])
-  role        Role      @relation(fields: [roleId], references: [id])
 
-  @@unique([adminUserId, roleId])
-  @@map("admin_user_roles")
-}
 
 model NavigationItem {
   id             String           @id @default(uuid())
@@ -211,7 +160,7 @@ model UserAccount {
   statements                UserAccountStatement[]
   transactions              UserAccountTransaction[]
   collectionEntries         CollectionEntry[]
-  createdBy                 AdminUser?               @relation("CreatedUserAccount", fields: [createdById], references: [id])
+  createdBy                 Staff?                   @relation("CreatedUserAccount", fields: [createdById], references: [id])
   user                      User                     @relation(fields: [userId], references: [id])
 
   @@index([userId])
@@ -237,7 +186,7 @@ model UserAccountTransaction {
   transactionType    TransactionType @default(DEPOSIT)
   account            UserAccount     @relation(fields: [accountId], references: [id])
   journalEntry       JournalEntry?   @relation(fields: [journalEntryId], references: [id])
-  performedBy        AdminUser?      @relation("PerformedByAdmin", fields: [performedById], references: [id])
+  performedBy        Staff?          @relation("PerformedByStaff", fields: [performedById], references: [id])
 
   @@index([accountId])
   @@index([transactionDate])
@@ -298,7 +247,7 @@ model UserAccountStatement {
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
   account             UserAccount @relation(fields: [accountId], references: [id])
-  generatedBy         AdminUser?  @relation("GeneratedByAdmin", fields: [generatedById], references: [id])
+  generatedBy         Staff?      @relation("GeneratedByStaff", fields: [generatedById], references: [id])
 
   @@index([accountId])
   @@index([periodStartDate, periodEndDate])
@@ -392,7 +341,7 @@ model LoanApplication {
   rejectionReason   String?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
-  approvedBy        AdminUser?        @relation("ApprovedByAdmin", fields: [approvedById], references: [id])
+  approvedBy        Staff?          @relation("ApprovedByStaff", fields: [approvedById], references: [id])
   loanType          LoanType          @relation(fields: [loanTypeId], references: [id])
   user              User              @relation(fields: [userId], references: [id])
   documents         LoanDocument[]
@@ -486,7 +435,7 @@ model LoanPayment {
   createdAt          DateTime         @default(now())
   installment        LoanInstallment? @relation(fields: [installmentId], references: [id])
   loan               Loan             @relation(fields: [loanId], references: [id])
-  receivedBy         AdminUser?       @relation("ReceivedByAdmin", fields: [receivedById], references: [id])
+  receivedBy         Staff?           @relation("ReceivedByStaff", fields: [receivedById], references: [id])
 
   @@map("loan_payments")
 }
@@ -505,7 +454,7 @@ model LoanDocument {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   loanApplication   LoanApplication @relation(fields: [loanApplicationId], references: [id], onDelete: Cascade)
-  verifiedBy        AdminUser?      @relation("VerifiedByAdmin", fields: [verifiedById], references: [id])
+  verifiedBy        Staff?          @relation("VerifiedByStaff", fields: [verifiedById], references: [id])
 
   @@index([loanApplicationId])
   @@index([status])
@@ -551,8 +500,8 @@ model JournalEntry {
   updatedAt           DateTime                 @updatedAt
   dayBookId           String?
   dayBookTransactions DayBookTransaction[]     @relation("DayBookTransactionJournalEntry")
-  approvedBy          AdminUser?               @relation("ApprovedByAdmin", fields: [approvedById], references: [id])
-  createdBy           AdminUser?               @relation("CreatedByAdmin", fields: [createdById], references: [id])
+  approvedBy          Staff?                   @relation("ApprovedByStaff", fields: [approvedById], references: [id])
+  createdBy           Staff?                   @relation("CreatedByStaff", fields: [createdById], references: [id])
   dayBook             DayBook?                 @relation("DayBookJournalEntries", fields: [dayBookId], references: [id])
   journalEntryLines   JournalEntryLine[]
   accountTransactions UserAccountTransaction[]
@@ -599,7 +548,7 @@ model DayBook {
   bookNumber          String               @unique
   closingBalance      Decimal              @default(0) @db.Decimal(15, 2)
   openingBalance      Decimal              @default(0) @db.Decimal(15, 2)
-  closedBy            AdminUser?           @relation("ClosedByAdmin", fields: [closedById], references: [id])
+  closedBy            Staff?               @relation("ClosedByStaff", fields: [closedById], references: [id])
   transactions        DayBookTransaction[]
   journalEntries      JournalEntry[]       @relation("DayBookJournalEntries")
 
@@ -622,7 +571,7 @@ model DayBookTransaction {
   createdById       String
   createdAt         DateTime               @default(now())
   updatedAt         DateTime               @updatedAt
-  createdBy         AdminUser              @relation("CreatedDayBookTransaction", fields: [createdById], references: [id])
+  createdBy         Staff                  @relation("CreatedDayBookTransaction", fields: [createdById], references: [id])
   dayBook           DayBook                @relation(fields: [dayBookId], references: [id], onDelete: Cascade)
   journalEntry      JournalEntry?          @relation("DayBookTransactionJournalEntry", fields: [journalEntryId], references: [id])
 
@@ -812,7 +761,7 @@ model TdsExemption {
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
   user            User       @relation(fields: [userId], references: [id])
-  verifiedBy      AdminUser? @relation("VerifiedByAdmin", fields: [verifiedById], references: [id])
+  verifiedBy      Staff?     @relation("VerifiedByStaff", fields: [verifiedById], references: [id])
 
   @@map("tds_exemptions")
 }
@@ -851,7 +800,7 @@ model TaxCertificate {
   status            CertificateStatus @default(GENERATED)
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
-  generatedBy       AdminUser?        @relation("GeneratedByAdmin", fields: [generatedById], references: [id])
+  generatedBy       Staff?          @relation("GeneratedByStaff", fields: [generatedById], references: [id])
   taxType           TaxType           @relation(fields: [taxTypeId], references: [id])
   user              User              @relation(fields: [userId], references: [id])
 
@@ -891,7 +840,7 @@ model ReportTemplate {
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
   reportJobs          ReportJob[]
-  createdBy           AdminUser?        @relation("CreatedByAdmin", fields: [createdById], references: [id])
+  createdBy           Staff?            @relation("CreatedByStaff", fields: [createdById], references: [id])
   scheduledReports    ScheduledReport[]
 
   @@map("report_templates")
@@ -1025,7 +974,7 @@ model ShareTransaction {
   updatedAt       DateTime             @updatedAt
   shareAccount    ShareAccount         @relation(fields: [shareAccountId], references: [id])
   certificate     ShareCertificate?    @relation(fields: [certificateId], references: [id])
-  createdBy       AdminUser?           @relation("CreatedShareTransaction", fields: [createdById], references: [id])
+  createdBy       Staff?               @relation("CreatedShareTransaction", fields: [createdById], references: [id])
 
   @@index([shareAccountId])
   @@index([transactionDate])
@@ -1045,7 +994,7 @@ model ShareCertificate {
   updatedAt         DateTime           @updatedAt
   shareAccount      ShareAccount       @relation(fields: [shareAccountId], references: [id])
   transactions      ShareTransaction[]
-  issuedBy          AdminUser?         @relation("IssuedShareCertificate", fields: [issuedById], references: [id])
+  issuedBy          Staff?             @relation("IssuedShareCertificate", fields: [issuedById], references: [id])
 
   @@index([shareAccountId])
   @@map("share_certificates")
@@ -1151,8 +1100,8 @@ model Budget {
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
   allocations  BudgetAllocation[]
-  approvedBy   AdminUser?         @relation("ApprovedByAdmin", fields: [approvedById], references: [id])
-  createdBy    AdminUser?         @relation("CreatedByAdmin", fields: [createdById], references: [id])
+  approvedBy   Staff?             @relation("ApprovedByStaff", fields: [approvedById], references: [id])
+  createdBy    Staff?             @relation("CreatedByStaffForBudget", fields: [createdById], references: [id])
 
   @@map("budgets")
 }
@@ -1193,31 +1142,60 @@ model AuditLog {
 }
 
 model Staff {
-  id                  String              @id @default(uuid())
-  employeeId          String              @unique
-  firstName           String
-  lastName            String
-  email               String              @unique
-  phone               String
-  address             String
-  dateOfBirth         DateTime
-  joinDate            DateTime
-  department          String
-  position            String
-  status              StaffStatus         @default(ACTIVE)
-  profileImage        String?
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-  failedLoginAttempts Int                 @default(0)
-  lastLogin           DateTime?
-  passwordHash        String?
-  attendance          Attendance[]
-  leaves              Leave[]
-  performanceReviews  PerformanceReview[]
-  documents           StaffDocument[]
-  roles               StaffRole[]
-  centers             Center[]
-  collectionSessions  CollectionSession[]
+  id                      String              @id @default(uuid())
+  employeeId              String              @unique
+  firstName               String
+  lastName                String
+  email                   String              @unique
+  phone                   String
+  address                 String
+  dateOfBirth             DateTime
+  joinDate                DateTime
+  department              String
+  position                String
+  status                  StaffStatus         @default(ACTIVE)
+  profileImage            String?
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+  failedLoginAttempts     Int                 @default(0)
+  lastLogin               DateTime?
+  passwordHash            String?
+  attendance              Attendance[]
+  leaves                  Leave[]
+  performanceReviews      PerformanceReview[]
+  documents               StaffDocument[]
+  roles                   StaffRole[]
+  centers                 Center[]
+  collectionSessions      CollectionSession[]
+  journalEntriesCreated   JournalEntry[]      @relation("CreatedByStaff")
+  journalEntriesApproved  JournalEntry[]      @relation("ApprovedByStaff")
+
+  // Consolidated Auth Fields
+  username                String?             @unique
+  passwordChangedAt       DateTime?
+  passwordResetToken      String?
+  passwordResetExpires    DateTime?
+  twoFactorEnabled        Boolean             @default(false)
+  twoFactorSecret         String?
+
+  // Relations
+  approvedBudgets            Budget[]                 @relation("ApprovedByStaff")
+  createdBudgets             Budget[]                 @relation("CreatedByStaffForBudget")
+  closedDayBooks             DayBook[]                @relation("ClosedByStaff")
+  createdDayBookTransactions DayBookTransaction[]     @relation("CreatedDayBookTransaction")
+  approvedLoans              LoanApplication[]        @relation("ApprovedByStaff")
+  verifiedDocuments          LoanDocument[]           @relation("VerifiedByStaff")
+  receivedPayments           LoanPayment[]            @relation("ReceivedByStaff")
+  createdReports             ReportTemplate[]         @relation("CreatedByStaff")
+  settingChanges             SettingAuditLog[]        @relation("ChangedByStaff")
+  updatedSettings            SystemSetting[]          @relation("UpdatedByStaff")
+  generatedCertificates      TaxCertificate[]         @relation("GeneratedByStaff")
+  verifiedExemptions         TdsExemption[]           @relation("VerifiedByStaff")
+  generatedStatements        UserAccountStatement[]   @relation("GeneratedByStaff")
+  performedTransactions      UserAccountTransaction[] @relation("PerformedByStaff")
+  createdUserAccounts        UserAccount[]            @relation("CreatedUserAccount")
+  createdShareTransactions   ShareTransaction[]       @relation("CreatedShareTransaction")
+  issuedShareCertificates    ShareCertificate[]       @relation("IssuedShareCertificate")
 
   @@map("staff")
 }
@@ -1320,7 +1298,7 @@ model SystemSetting {
   updatedAt   DateTime          @updatedAt
   updatedById String?
   auditLogs   SettingAuditLog[]
-  updatedBy   AdminUser?        @relation("UpdatedByAdmin", fields: [updatedById], references: [id])
+  updatedBy   Staff?            @relation("UpdatedByStaff", fields: [updatedById], references: [id])
 
   @@index([key])
   @@index([category])
@@ -1350,7 +1328,7 @@ model SettingAuditLog {
   reason      String?
   changedById String
   changedAt   DateTime      @default(now())
-  changedBy   AdminUser     @relation("ChangedByAdmin", fields: [changedById], references: [id])
+  changedBy   Staff         @relation("ChangedByStaff", fields: [changedById], references: [id])
   setting     SystemSetting @relation(fields: [settingId], references: [id])
 
   @@index([settingId])

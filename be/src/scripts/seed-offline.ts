@@ -6,26 +6,18 @@ const prisma = new PrismaClient();
 async function main() {
     console.log('Start seeding offline mode data...');
 
-    // 1. Create Field Officer (AdminUser + Staff)
+    // 1. Create Field Officer (as Staff with auth fields)
     const passwordHash = await hash('password123', 10);
 
-    const adminUser = await prisma.adminUser.upsert({
-        where: { username: 'fieldofficer' },
-        update: {},
-        create: {
-            username: 'fieldofficer',
-            email: 'officer@example.com',
-            passwordHash,
-            fullName: 'Field Officer',
-            isActive: true,
-        },
-    });
+    // Removed AdminUser creation as it's consolidated into Staff
 
     const staff = await prisma.staff.upsert({
         where: { employeeId: 'FO001' },
         update: {},
         create: {
             employeeId: 'FO001',
+            username: 'fieldofficer',
+            passwordHash,
             firstName: 'Field',
             lastName: 'Officer',
             email: 'officer@example.com',

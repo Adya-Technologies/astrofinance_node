@@ -3,7 +3,7 @@ import { body, param } from 'express-validator';
 /**
  * Validation schema for creating admin user
  */
-export const createAdminUserValidation = [
+export const createUserValidation = [
   body('username')
     .notEmpty()
     .withMessage('Username is required')
@@ -46,7 +46,7 @@ export const createAdminUserValidation = [
 /**
  * Validation schema for updating admin user
  */
-export const updateAdminUserValidation = [
+export const updateUserValidation = [
   param('id')
     .notEmpty()
     .withMessage('User ID is required'),

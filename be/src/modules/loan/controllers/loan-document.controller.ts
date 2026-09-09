@@ -31,7 +31,8 @@ export const getLoanDocuments = async (req: Request, res: Response) => {
           select: {
             id: true,
             username: true,
-            fullName: true
+            firstName: true,
+            lastName: true
           }
         }
       },
@@ -85,7 +86,8 @@ export const uploadLoanDocument = async (req: Request, res: Response) => {
           select: {
             id: true,
             username: true,
-            fullName: true
+            firstName: true,
+            lastName: true
           }
         }
       }
@@ -116,7 +118,7 @@ export const verifyLoanDocument = async (req: Request, res: Response) => {
   try {
     const { documentId } = req.params;
     const { status, verificationNotes } = req.body;
-    const adminUserId = req.adminUser.id;
+    const adminUserId = req.staff?.id;
 
     // Check if document exists
     const existingDocument = await prisma.loanDocument.findUnique({
@@ -141,7 +143,8 @@ export const verifyLoanDocument = async (req: Request, res: Response) => {
           select: {
             id: true,
             username: true,
-            fullName: true
+            firstName: true,
+            lastName: true
           }
         }
       }

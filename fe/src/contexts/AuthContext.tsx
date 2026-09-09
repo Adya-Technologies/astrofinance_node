@@ -87,8 +87,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.log('Redirecting to admin dashboard');
         router.push('/admin/dashboard');
       } else if (response.user.userType === 'STAFF') {
-        console.log('Redirecting to office dashboard');
-        router.push('/office/dashboard');
+        console.log('Redirecting to staff dashboard');
+        router.push('/staff/dashboard');
       } else {
         console.log('Redirecting to user dashboard');
         router.push('/dashboard');

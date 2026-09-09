@@ -31,9 +31,38 @@ const FieldDashboard = () => {
 
     return (
         <FieldLayout title="Dashboard">
-            <div className="mb-4">
-                <h2 className="text-lg font-semibold text-gray-800">Welcome, {user?.firstName}</h2>
-                <p className="text-sm text-gray-600">Select a center to start collection.</p>
+            {/* Hero Section with Quick Stats */}
+            <div className="mb-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-1">Welcome, {user?.fullName}</h2>
+                <p className="text-gray-600">Ready to collect today?</p>
+            </div>
+
+            {/* Quick Stats */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-4 rounded-xl shadow-lg">
+                    <div className="text-3xl font-bold mb-1">
+                        {centers.length}
+                    </div>
+                    <div className="text-blue-100 text-sm">Centers Available</div>
+                </div>
+                <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-4 rounded-xl shadow-lg">
+                    <div className="text-3xl font-bold mb-1">
+                        {groups.length}
+                    </div>
+                    <div className="text-green-100 text-sm">Total Groups</div>
+                </div>
+            </div>
+
+            {/* Last Sync Info */}
+            <div className="bg-amber-50 border-l-4 border-amber-500 p-3 mb-6 rounded">
+                <div className="flex items-center">
+                    <div className="text-amber-600 text-sm">
+                        <strong>Last Synced:</strong> {localStorage.getItem('lastSyncTime')
+                            ? new Date(localStorage.getItem('lastSyncTime')!).toLocaleString()
+                            : 'Never'
+                        }
+                    </div>
+                </div>
             </div>
 
             {!selectedCenter ? (

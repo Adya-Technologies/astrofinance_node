@@ -3,23 +3,16 @@ import bcrypt from 'bcrypt';
 import prisma from '../../../config/database';
 import logger from '../../../config/logger';
 import { createAuditLog } from '../../../common/utils/audit.util';
-import { AuditAction } from '@prisma/client';
+import { AuditAction, StaffStatus } from '@prisma/client';
 import { ApiError } from '../../../common/middleware/error.middleware';
 
 /**
- * Get all admin users
+ * Get all admin users (Now mapped to Staff)
  */
-export const getAllAdminUsers = async (req: Request, res: Response) => {
+export const getAllUsers = async (req: Request, res: Response) => {
   try {
-    const adminUsers = await prisma.adminUser.findMany({
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        fullName: true,
-        isActive: true,
-        lastLogin: true,
-        createdAt: true,
+    const staffUsers = await prisma.staff.findMany({
+      include: {
         roles: {
           include: {
             role: {
@@ -36,7 +29,18 @@ export const getAllAdminUsers = async (req: Request, res: Response) => {
       }
     });
 
-    return res.json(adminUsers);
+    const mappedUsers = staffUsers.map(user => ({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      fullName: `${user.firstName} ${user.lastName}`,
+      isActive: user.status === 'ACTIVE',
+      lastLogin: user.lastLogin,
+      createdAt: user.joinDate,
+      roles: user.roles
+    }));
+
+    return res.json(mappedUsers);
   } catch (error) {
     logger.error('Get all admin users error:', error);
     throw new ApiError(500, 'Failed to fetch admin users');
@@ -46,21 +50,13 @@ export const getAllAdminUsers = async (req: Request, res: Response) => {
 /**
  * Get admin user by ID
  */
-export const getAdminUserById = async (req: Request, res: Response) => {
+export const getUserById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const adminUser = await prisma.adminUser.findUnique({
+    const user = await prisma.staff.findUnique({
       where: { id },
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        fullName: true,
-        isActive: true,
-        lastLogin: true,
-        createdAt: true,
-        updatedAt: true,
+      include: {
         roles: {
           include: {
             role: {
@@ -75,27 +71,39 @@ export const getAdminUserById = async (req: Request, res: Response) => {
       }
     });
 
-    if (!adminUser) {
-      throw new ApiError(404, 'Admin user not found');
+    if (!user) {
+      throw new ApiError(404, 'User not found');
     }
 
-    return res.json(adminUser);
+    const mappedUser = {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      fullName: `${user.firstName} ${user.lastName}`,
+      isActive: user.status === 'ACTIVE',
+      lastLogin: user.lastLogin,
+      createdAt: user.joinDate,
+      updatedAt: user.joinDate, // approximated
+      roles: user.roles
+    };
+
+    return res.json(mappedUser);
   } catch (error) {
     logger.error(`Get admin user by ID error: ${error}`);
     if (error instanceof ApiError) throw error;
-    throw new ApiError(500, 'Failed to fetch admin user');
+    throw new ApiError(500, 'Failed to fetch user');
   }
 };
 
 /**
- * Create new admin user
+ * Create new admin user (Creates a Staff record)
  */
-export const createAdminUser = async (req: Request, res: Response) => {
+export const createUser = async (req: Request, res: Response) => {
   try {
     const { username, email, password, fullName, isActive = true, roleIds = [] } = req.body;
 
     // Check if username or email already exists
-    const existingUser = await prisma.adminUser.findFirst({
+    const existingUser = await prisma.staff.findFirst({
       where: {
         OR: [
           { username },
@@ -115,39 +123,40 @@ export const createAdminUser = async (req: Request, res: Response) => {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Validate roles
-    if (roleIds.length > 0) {
-      const roles = await prisma.role.findMany({
-        where: {
-          id: {
-            in: roleIds
-          }
-        }
-      });
+    // Split fullName
+    const nameParts = fullName.trim().split(' ');
+    const firstName = nameParts[0];
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Staff';
 
-      if (roles.length !== roleIds.length) {
-        throw new ApiError(400, 'One or more role IDs are invalid');
-      }
-    }
+    // Generate pseudo-random employeeId if not provided (Assuming logic)
+    const employeeId = `EMP${Date.now().toString().slice(-6)}`;
 
-    // Create admin user with roles in a transaction
-    const adminUser = await prisma.$transaction(async (tx) => {
+    // Create staff user with roles in a transaction
+    const newStaff = await prisma.$transaction(async (tx) => {
       // Create user
-      const user = await tx.adminUser.create({
+      const user = await tx.staff.create({
         data: {
+          employeeId,
           username,
           email,
           passwordHash,
-          fullName,
-          isActive
+          firstName,
+          lastName,
+          status: isActive ? 'ACTIVE' : 'INACTIVE',
+          phone: '', // Required field, need default
+          address: '', // Required field, need default
+          dateOfBirth: new Date(), // Required field
+          joinDate: new Date(),
+          department: 'Administration',
+          position: 'Admin Staff'
         }
       });
 
       // Assign roles
       for (const roleId of roleIds) {
-        await tx.adminUserRole.create({
+        await tx.staffRole.create({
           data: {
-            adminUserId: user.id,
+            staffId: user.id,
             roleId
           }
         });
@@ -157,8 +166,8 @@ export const createAdminUser = async (req: Request, res: Response) => {
     });
 
     // Get created user with roles
-    const createdUser = await prisma.adminUser.findUnique({
-      where: { id: adminUser.id },
+    const createdUser = await prisma.staff.findUnique({
+      where: { id: newStaff.id },
       include: {
         roles: {
           include: {
@@ -171,8 +180,8 @@ export const createAdminUser = async (req: Request, res: Response) => {
     // Create audit log
     await createAuditLog(
       req,
-      'AdminUser',
-      adminUser.id,
+      'Staff',
+      newStaff.id,
       AuditAction.CREATE,
       null,
       {
@@ -188,8 +197,8 @@ export const createAdminUser = async (req: Request, res: Response) => {
       id: createdUser?.id,
       username: createdUser?.username,
       email: createdUser?.email,
-      fullName: createdUser?.fullName,
-      isActive: createdUser?.isActive,
+      fullName: `${createdUser?.firstName} ${createdUser?.lastName}`,
+      isActive: createdUser?.status === 'ACTIVE',
       roles: createdUser?.roles.map(r => ({
         id: r.role.id,
         name: r.role.name
@@ -203,15 +212,15 @@ export const createAdminUser = async (req: Request, res: Response) => {
 };
 
 /**
- * Update admin user
+ * Update admin user (Updates Staff)
  */
-export const updateAdminUser = async (req: Request, res: Response) => {
+export const updateUser = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { email, fullName, isActive, roleIds } = req.body;
 
     // Check if user exists
-    const existingUser = await prisma.adminUser.findUnique({
+    const existingUser = await prisma.staff.findUnique({
       where: { id },
       include: {
         roles: true
@@ -219,7 +228,7 @@ export const updateAdminUser = async (req: Request, res: Response) => {
     });
 
     if (!existingUser) {
-      throw new ApiError(404, 'Admin user not found');
+      throw new ApiError(404, 'User not found');
     }
 
     // Prevent deactivating the main admin account
@@ -229,7 +238,7 @@ export const updateAdminUser = async (req: Request, res: Response) => {
 
     // Check if email is already taken by another user
     if (email && email !== existingUser.email) {
-      const emailExists = await prisma.adminUser.findFirst({
+      const emailExists = await prisma.staff.findFirst({
         where: {
           email,
           id: { not: id }
@@ -241,30 +250,23 @@ export const updateAdminUser = async (req: Request, res: Response) => {
       }
     }
 
-    // Validate roles if provided
-    if (roleIds && Array.isArray(roleIds)) {
-      const roles = await prisma.role.findMany({
-        where: {
-          id: {
-            in: roleIds
-          }
-        }
-      });
-
-      if (roles.length !== roleIds.length) {
-        throw new ApiError(400, 'One or more role IDs are invalid');
-      }
+    let firstName: string | undefined, lastName: string | undefined;
+    if (fullName) {
+      const nameParts = fullName.trim().split(' ');
+      firstName = nameParts[0];
+      lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : existingUser.lastName;
     }
 
     // Update user in a transaction
     await prisma.$transaction(async (tx) => {
       // Update user details
-      await tx.adminUser.update({
+      await tx.staff.update({
         where: { id },
         data: {
           email: email || existingUser.email,
-          fullName: fullName || existingUser.fullName,
-          isActive: isActive !== undefined ? isActive : existingUser.isActive
+          firstName: firstName || existingUser.firstName,
+          lastName: lastName || existingUser.lastName,
+          status: isActive !== undefined ? (isActive ? 'ACTIVE' : 'INACTIVE') : existingUser.status
         }
       });
 
@@ -274,9 +276,9 @@ export const updateAdminUser = async (req: Request, res: Response) => {
         const existingRoleIds = existingUser.roles.map(r => r.roleId);
 
         // Remove roles that are not in the new list
-        await tx.adminUserRole.deleteMany({
+        await tx.staffRole.deleteMany({
           where: {
-            adminUserId: id,
+            staffId: id,
             roleId: {
               notIn: roleIds
             }
@@ -289,9 +291,9 @@ export const updateAdminUser = async (req: Request, res: Response) => {
         );
 
         for (const roleId of newRoleIds) {
-          await tx.adminUserRole.create({
+          await tx.staffRole.create({
             data: {
-              adminUserId: id,
+              staffId: id,
               roleId
             }
           });
@@ -300,7 +302,7 @@ export const updateAdminUser = async (req: Request, res: Response) => {
     });
 
     // Get updated user with roles
-    const updatedUser = await prisma.adminUser.findUnique({
+    const updatedUser = await prisma.staff.findUnique({
       where: { id },
       include: {
         roles: {
@@ -314,19 +316,19 @@ export const updateAdminUser = async (req: Request, res: Response) => {
     // Create audit log
     await createAuditLog(
       req,
-      'AdminUser',
+      'Staff',
       id,
       AuditAction.UPDATE,
       {
         email: existingUser.email,
-        fullName: existingUser.fullName,
-        isActive: existingUser.isActive,
+        fullName: `${existingUser.firstName} ${existingUser.lastName}`,
+        isActive: existingUser.status === 'ACTIVE',
         roles: existingUser.roles.map(r => r.roleId)
       },
       {
         email: email || existingUser.email,
-        fullName: fullName || existingUser.fullName,
-        isActive: isActive !== undefined ? isActive : existingUser.isActive,
+        fullName: fullName || `${existingUser.firstName} ${existingUser.lastName}`,
+        isActive: isActive !== undefined ? isActive : existingUser.status === 'ACTIVE',
         roles: roleIds || existingUser.roles.map(r => r.roleId)
       }
     );
@@ -335,8 +337,8 @@ export const updateAdminUser = async (req: Request, res: Response) => {
       id: updatedUser?.id,
       username: updatedUser?.username,
       email: updatedUser?.email,
-      fullName: updatedUser?.fullName,
-      isActive: updatedUser?.isActive,
+      fullName: `${updatedUser?.firstName} ${updatedUser?.lastName}`,
+      isActive: updatedUser?.status === 'ACTIVE',
       roles: updatedUser?.roles.map(r => ({
         id: r.role.id,
         name: r.role.name
@@ -345,32 +347,32 @@ export const updateAdminUser = async (req: Request, res: Response) => {
   } catch (error) {
     logger.error(`Update admin user error: ${error}`);
     if (error instanceof ApiError) throw error;
-    throw new ApiError(500, 'Failed to update admin user');
+    throw new ApiError(500, 'Failed to update user');
   }
 };
 
 /**
  * Reset admin user password
  */
-export const resetAdminUserPassword = async (req: Request, res: Response) => {
+export const resetUserPassword = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { newPassword } = req.body;
 
     // Check if user exists
-    const existingUser = await prisma.adminUser.findUnique({
+    const existingUser = await prisma.staff.findUnique({
       where: { id }
     });
 
     if (!existingUser) {
-      throw new ApiError(404, 'Admin user not found');
+      throw new ApiError(404, 'User not found');
     }
 
     // Hash new password
     const passwordHash = await bcrypt.hash(newPassword, 10);
 
     // Update password
-    await prisma.adminUser.update({
+    await prisma.staff.update({
       where: { id },
       data: { passwordHash }
     });
@@ -378,12 +380,12 @@ export const resetAdminUserPassword = async (req: Request, res: Response) => {
     // Create audit log
     await createAuditLog(
       req,
-      'AdminUser',
+      'Staff',
       id,
       AuditAction.PASSWORD_CHANGE,
       null,
       null,
-      { resetByAdmin: req.adminUser.id }
+      { resetByAdmin: req.user?.id || 'unknown' } // Logged in admin
     );
 
     return res.json({ message: 'Password reset successfully' });

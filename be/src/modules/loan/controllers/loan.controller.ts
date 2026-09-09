@@ -171,7 +171,7 @@ export const getLoanInstallments = async (req: Request, res: Response) => {
 export const disburseLoan = async (req: Request, res: Response) => {
   try {
     const { applicationId, disbursementDate, firstPaymentDate } = req.body;
-    const adminUserId = req.adminUser.id;
+    const adminUserId = req.staff?.id;
 
     // Check if application exists and is approved
     const application = await prisma.loanApplication.findUnique({
@@ -320,7 +320,7 @@ export const processLoanPayment = async (req: Request, res: Response) => {
       paymentMethod,
       referenceNumber
     } = req.body;
-    const adminUserId = req.adminUser.id;
+    const adminUserId = req.staff?.id;
 
     // Check if loan exists and is active
     const loan = await prisma.loan.findUnique({
@@ -568,7 +568,7 @@ export const processEarlySettlement = async (req: Request, res: Response) => {
       paymentMethod,
       referenceNumber
     } = req.body;
-    const adminUserId = req.adminUser.id;
+    const adminUserId = req.staff?.id;
 
     // Check if loan exists and is active
     const loan = await prisma.loan.findUnique({

@@ -3,36 +3,84 @@ import { useQuery } from 'react-query';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/contexts/AuthContext';
 import MainLayout from '@/components/layout/MainLayout';
-import Card from '@/components/common/Card';
-import { fetchDashboardSummary, DashboardSummary } from '@/services/dashboard.service';
+import StatCard from '@/components/dashboard/StatCard';
+import AlertList, { AlertItem } from '@/components/dashboard/AlertList';
+import apiService from '@/services/api';
 import {
-  UsersIcon,
-  BanknotesIcon,
-  ClockIcon,
-  CurrencyDollarIcon,
-  ChartBarIcon,
-  DocumentTextIcon,
+  ExclamationTriangleIcon,
   CheckCircleIcon,
+  XCircleIcon,
+  ClockIcon
 } from '@heroicons/react/24/outline';
 
-const AdminDashboard = () => {
+// Type definitions for API responses
+interface PortfolioHealth {
+  totalOutstanding: number;
+  par1: number;
+  par7: number;
+  par30: number;
+  collectionEfficiencyToday: number;
+  collectionEfficiencyMTD: number;
+  activeCenters: number;
+  atRiskCenters: number;
+}
+
+interface DeterioratingCenter {
+  centerId: string;
+  centerName: string;
+  trendScore: number;
+  reasons: string[];
+  lastMeetingDate: string | null;
+  assignedOfficer: string;
+}
+
+interface FieldOperations {
+  lateUploads: number;
+  gpsAnomalies: number;
+  cashVariances: number;
+  lateUploadsList: any[];
+  gpsAnomaliesList: any[];
+  cashVariancesList: any[];
+}
+
+interface ComplianceMetrics {
+  daysSinceReconciliation: number;
+  unpostedJournals: number;
+  auditExceptions: number;
+  nrbReportReadiness: {
+    status: 'READY' | 'INCOMPLETE';
+    missingItems: string[];
+  };
+}
+
+interface AdminDashboardData {
+  portfolioHealth: PortfolioHealth;
+  earlyWarning: {
+    deterioratingCenters: DeterioratingCenter[];
+  };
+  fieldOperations: FieldOperations;
+  compliance: ComplianceMetrics;
+}
+
+const AdminDashboardV2 = () => {
   const { isAuthenticated, isAdmin, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
   // Fetch dashboard data
-  const { data: dashboardData, isLoading: isDashboardLoading } = useQuery(
-    'adminDashboardSummary',
-    fetchDashboardSummary,
+  const { data, isLoading, error } = useQuery<AdminDashboardData>(
+    'adminDashboardV2',
+    () => apiService.get('/dashboard/admin/summary'),
     {
       enabled: isAuthenticated && isAdmin,
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: 2 * 60 * 1000, // 2 minutes
+      refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes
     }
   );
 
   // Redirect if not authenticated or not admin
   React.useEffect(() => {
     if (!authLoading && (!isAuthenticated || !isAdmin)) {
-      router.push('/login');
+      router.push('/login?type=admin');
     }
   }, [authLoading, isAuthenticated, isAdmin, router]);
 
@@ -44,289 +92,265 @@ const AdminDashboard = () => {
     );
   }
 
+  if (error) {
+    return (
+      <MainLayout title="Admin Dashboard">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+          <XCircleIcon className="w-12 h-12 text-red-500 mx-auto mb-3" />
+          <h3 className="text-lg font-medium text-red-900 mb-2">Failed to Load Dashboard</h3>
+          <p className="text-sm text-red-700">
+            {error instanceof Error ? error.message : 'Unknown error occurred'}
+          </p>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  const portfolio = data?.portfolioHealth;
+  const earlyWarning = data?.earlyWarning;
+  const fieldOps = data?.fieldOperations;
+  const compliance = data?.compliance;
+
+  // Determine PAR status colors
+  const getPARStatus = (par: number): 'green' | 'yellow' | 'red' => {
+    if (par < 2) return 'green';
+    if (par < 5) return 'yellow';
+    return 'red';
+  };
+
+  const getCollectionEfficiencyStatus = (efficiency: number): 'green' | 'yellow' | 'red' => {
+    if (efficiency >= 90) return 'green';
+    if (efficiency >= 75) return 'yellow';
+    return 'red';
+  };
+
+  const getComplianceStatus = (days: number): 'green' | 'yellow' | 'red' => {
+    if (days <= 1) return 'green';
+    if (days <= 3) return 'yellow';
+    return 'red';
+  };
+
+  // Convert deteriorating centers to alert items
+  const earlyWarningAlerts: AlertItem[] = earlyWarning?.deterioratingCenters.map(center => ({
+    id: center.centerId,
+    title: `${center.centerName} - Trend Score: ${center.trendScore}`,
+    subtitle: `Reasons: ${center.reasons.map(r => r.replace(/_/g, ' ')).join(', ')} | Officer: ${center.assignedOfficer}`,
+    severity: center.trendScore > 60 ? 'critical' : center.trendScore > 30 ? 'warning' : 'info',
+    href: `/admin/centers/${center.centerId}`
+  })) || [];
+
+  // Field operations alerts
+  const fieldOperationsAlerts: AlertItem[] = [];
+  if (fieldOps) {
+    if (fieldOps.lateUploads > 0) {
+      fieldOperationsAlerts.push({
+        id: 'late-uploads',
+        title: `${fieldOps.lateUploads} officers have not uploaded data`,
+        severity: 'warning',
+        href: '/admin/staff'
+      });
+    }
+    if (fieldOps.gpsAnomalies > 0) {
+      fieldOperationsAlerts.push({
+        id: 'gps-anomalies',
+        title: `${fieldOps.gpsAnomalies} GPS anomalies detected`,
+        severity: 'critical',
+        href: '/admin/staff'
+      });
+    }
+    if (fieldOps.cashVariances > 0) {
+      fieldOperationsAlerts.push({
+        id: 'cash-variances',
+        title: `${fieldOps.cashVariances} officers with cash discrepancies`,
+        severity: 'critical',
+        href: '/admin/staff'
+      });
+    }
+  }
+
+  // Compliance alerts
+  const complianceAlerts: AlertItem[] = [];
+  if (compliance) {
+    if (compliance.unpostedJournals > 0) {
+      complianceAlerts.push({
+        id: 'unposted-journals',
+        title: `${compliance.unpostedJournals} unposted journal entries`,
+        severity: 'warning',
+        href: '/accounting/journal-entries'
+      });
+    }
+    if (compliance.auditExceptions > 0) {
+      complianceAlerts.push({
+        id: 'audit-exceptions',
+        title: `${compliance.auditExceptions} audit exceptions found`,
+        severity: 'critical',
+        href: '/accounting/reports'
+      });
+    }
+    if (compliance.nrbReportReadiness.status === 'INCOMPLETE') {
+      complianceAlerts.push({
+        id: 'nrb-readiness',
+        title: 'NRB Report Not Ready',
+        subtitle: compliance.nrbReportReadiness.missingItems.join('; '),
+        severity: 'warning',
+        href: '/admin/reports'
+      });
+    }
+  }
+
   return (
     <MainLayout title="Admin Dashboard">
       <div className="space-y-6">
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          <Card className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <UsersIcon className="h-6 w-6 text-gray-400" aria-hidden="true" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Total Users</dt>
-                    <dd>
-                      <div className="text-lg font-medium text-gray-900">
-                        {isDashboardLoading ? '...' : dashboardData?.users.total}
-                      </div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <a href="/admin/users" className="font-medium text-primary-700 hover:text-primary-900">
-                  View all
-                </a>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <BanknotesIcon className="h-6 w-6 text-gray-400" aria-hidden="true" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Active Loans</dt>
-                    <dd>
-                      <div className="text-lg font-medium text-gray-900">
-                        {isDashboardLoading ? '...' : dashboardData?.loans.active}
-                      </div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <a href="/admin/loans" className="font-medium text-primary-700 hover:text-primary-900">
-                  View all
-                </a>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <ClockIcon className="h-6 w-6 text-gray-400" aria-hidden="true" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Pending Applications</dt>
-                    <dd>
-                      <div className="text-lg font-medium text-gray-900">
-                        {isDashboardLoading ? '...' : dashboardData?.pendingApplications}
-                      </div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <a href="/admin/loans/applications" className="font-medium text-primary-700 hover:text-primary-900">
-                  View all
-                </a>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <CurrencyDollarIcon className="h-6 w-6 text-gray-400" aria-hidden="true" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Total Disbursed</dt>
-                    <dd>
-                      <div className="text-lg font-medium text-gray-900">
-                        {isDashboardLoading ? '...' : `$${dashboardData?.loans.totalAmount.toLocaleString()}`}
-                      </div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <a href="/admin/reports/disbursements" className="font-medium text-primary-700 hover:text-primary-900">
-                  View details
-                </a>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <ChartBarIcon className="h-6 w-6 text-gray-400" aria-hidden="true" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Outstanding Amount</dt>
-                    <dd>
-                      <div className="text-lg font-medium text-gray-900">
-                        {isDashboardLoading ? '...' : `$${dashboardData?.loans.outstandingAmount.toLocaleString()}`}
-                      </div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <a href="/admin/reports/collections" className="font-medium text-primary-700 hover:text-primary-900">
-                  View details
-                </a>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <DocumentTextIcon className="h-6 w-6 text-gray-400" aria-hidden="true" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Active Staff</dt>
-                    <dd>
-                      <div className="text-lg font-medium text-gray-900">
-                        {isDashboardLoading ? '...' : dashboardData?.staff.active}
-                      </div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <a href="/admin/loans/overdue" className="font-medium text-primary-700 hover:text-primary-900">
-                  View all
-                </a>
-              </div>
-            </div>
-          </Card>
+        {/* Page Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Portfolio Overview</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Real-time analytics and early warnings
+            </p>
+          </div>
+          <div className="text-sm text-gray-500">
+            Last updated: {new Date().toLocaleTimeString()}
+          </div>
         </div>
 
-        {/* Recent Activity */}
-        <Card title="Recent Activity">
-          <div className="flow-root">
-            <ul role="list" className="-mb-8">
-              {isDashboardLoading ? (
-                <li className="py-4 text-center text-sm text-gray-500">
-                  Loading...
-                </li>
-              ) : dashboardData?.recentActivities && dashboardData.recentActivities.length > 0 ? (
-                dashboardData.recentActivities.map((activity, activityIdx) => (
-                  <li key={activity.id}>
-                    <div className="relative pb-8">
-                      {activityIdx !== dashboardData.recentActivities.length - 1 ? (
-                        <span
-                          className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200"
-                          aria-hidden="true"
-                        />
-                      ) : null}
-                      <div className="relative flex space-x-3">
-                        <div>
-                          <span
-                            className={`h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white ${activity.type === 'LOAN_APPLICATION'
-                                ? 'bg-blue-500'
-                                : activity.type === 'LOAN_APPROVAL'
-                                  ? 'bg-green-500'
-                                  : activity.type === 'PAYMENT'
-                                    ? 'bg-purple-500'
-                                    : activity.type === 'USER_REGISTRATION'
-                                      ? 'bg-yellow-500'
-                                      : 'bg-gray-500'
-                              }`}
-                          >
-                            {activity.type === 'LOAN_APPLICATION' ? (
-                              <BanknotesIcon className="h-5 w-5 text-white" aria-hidden="true" />
-                            ) : activity.type === 'LOAN_APPROVAL' ? (
-                              <CheckCircleIcon className="h-5 w-5 text-white" aria-hidden="true" />
-                            ) : activity.type === 'PAYMENT' ? (
-                              <CurrencyDollarIcon className="h-5 w-5 text-white" aria-hidden="true" />
-                            ) : activity.type === 'USER_REGISTRATION' ? (
-                              <UsersIcon className="h-5 w-5 text-white" aria-hidden="true" />
-                            ) : (
-                              <DocumentTextIcon className="h-5 w-5 text-white" aria-hidden="true" />
-                            )}
-                          </span>
-                        </div>
-                        <div className="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
-                          <div>
-                            <p className="text-sm text-gray-500">
-                              {activity.description}{' '}
-                              <a href={`/admin/users/${activity.user.id}`} className="font-medium text-gray-900">
-                                {activity.user.name}
-                              </a>
-                            </p>
-                          </div>
-                          <div className="text-right text-sm whitespace-nowrap text-gray-500">
-                            {new Date(activity.timestamp).toLocaleString()}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </li>
-                ))
-              ) : (
-                <li className="py-4 text-center text-sm text-gray-500">
-                  No recent activity found.
-                </li>
-              )}
-            </ul>
+        {/* A. Portfolio Health Snapshot - Top Strip (No Scrolling) */}
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Portfolio Health</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              label="Total Outstanding"
+              value={portfolio?.totalOutstanding || 0}
+              unit="NPR"
+              decimals={0}
+              status="green"
+            />
+            <StatCard
+              label="PAR 1"
+              value={portfolio?.par1 || 0}
+              unit="%"
+              status={getPARStatus(portfolio?.par1 || 0)}
+            />
+            <StatCard
+              label="PAR 7"
+              value={portfolio?.par7 || 0}
+              unit="%"
+              status={getPARStatus(portfolio?.par7 || 0)}
+            />
+            <StatCard
+              label="PAR 30"
+              value={portfolio?.par30 || 0}
+              unit="%"
+              status={getPARStatus(portfolio?.par30 || 0)}
+            />
           </div>
-          <div className="mt-6">
-            <a
-              href="/admin/activity"
-              className="w-full flex justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-            >
-              View all activity
-            </a>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mt-4">
+            <StatCard
+              label="Collection Efficiency (Today)"
+              value={portfolio?.collectionEfficiencyToday || 0}
+              unit="%"
+              status={getCollectionEfficiencyStatus(portfolio?.collectionEfficiencyToday || 0)}
+            />
+            <StatCard
+              label="Collection Efficiency (MTD)"
+              value={portfolio?.collectionEfficiencyMTD || 0}
+              unit="%"
+              status={getCollectionEfficiencyStatus(portfolio?.collectionEfficiencyMTD || 0)}
+            />
+            <StatCard
+              label="Active Centers"
+              value={portfolio?.activeCenters || 0}
+              status="green"
+              decimals={0}
+            />
+            <StatCard
+              label="At-Risk Centers"
+              value={portfolio?.atRiskCenters || 0}
+              status={portfolio && portfolio.atRiskCenters > 0 ? 'red' : 'green'}
+              decimals={0}
+              onClick={() => router.push('/admin/centers')}
+            />
           </div>
-        </Card>
+        </div>
 
-        {/* Quick Actions */}
-        <Card title="Quick Actions">
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            <a
-              href="/admin/users/new"
-              className="inline-block rounded-md bg-white px-4 py-6 text-center shadow-md hover:shadow-lg transition-shadow duration-200"
-            >
-              <UsersIcon className="mx-auto h-8 w-8 text-primary-600" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">Add New User</h3>
-            </a>
-
-            <a
-              href="/admin/loans/applications/pending"
-              className="inline-block rounded-md bg-white px-4 py-6 text-center shadow-md hover:shadow-lg transition-shadow duration-200"
-            >
-              <ClockIcon className="mx-auto h-8 w-8 text-primary-600" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">Review Applications</h3>
-            </a>
-
-            <a
-              href="/admin/loans/disburse"
-              className="inline-block rounded-md bg-white px-4 py-6 text-center shadow-md hover:shadow-lg transition-shadow duration-200"
-            >
-              <BanknotesIcon className="mx-auto h-8 w-8 text-primary-600" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">Disburse Loans</h3>
-            </a>
-
-            <a
-              href="/admin/reports/generate"
-              className="inline-block rounded-md bg-white px-4 py-6 text-center shadow-md hover:shadow-lg transition-shadow duration-200"
-            >
-              <DocumentTextIcon className="mx-auto h-8 w-8 text-primary-600" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">Generate Reports</h3>
-            </a>
+        {/* B. Early Warning Radar - Killer Feature */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center mb-4">
+            <ExclamationTriangleIcon className="w-6 h-6 text-orange-500 mr-2" />
+            <h2 className="text-lg font-semibold text-gray-900">Early Warning Radar</h2>
           </div>
-        </Card>
+          <p className="text-sm text-gray-600 mb-4">
+            Centers with deteriorating trends - prioritize interventions here
+          </p>
+          {isLoading ? (
+            <div className="text-center py-8 text-gray-500">Loading...</div>
+          ) : (
+            <AlertList
+              items={earlyWarningAlerts}
+              emptyMessage="✓ No deteriorating centers detected"
+            />
+          )}
+        </div>
+
+        {/* C. Field Operations Integrity Panel */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center mb-4">
+            <ClockIcon className="w-6 h-6 text-blue-500 mr-2" />
+            <h2 className="text-lg font-semibold text-gray-900">Field Operations Integrity</h2>
+          </div>
+          <p className="text-sm text-gray-600 mb-4">
+            Officer upload status and anomalies
+          </p>
+          {isLoading ? (
+            <div className="text-center py-8 text-gray-500">Loading...</div>
+          ) : (
+            <AlertList
+              items={fieldOperationsAlerts}
+              emptyMessage="✓ All field operations normal"
+            />
+          )}
+        </div>
+
+        {/* D. Compliance & Audit Readiness */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center mb-4">
+            <CheckCircleIcon className="w-6 h-6 text-green-500 mr-2" />
+            <h2 className="text-lg font-semibold text-gray-900">Compliance & Audit Readiness</h2>
+          </div>
+
+          {isLoading ? (
+            <div className="text-center py-8 text-gray-500">Loading...</div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-4">
+                <StatCard
+                  label="Days Since Reconciliation"
+                  value={compliance?.daysSinceReconciliation || 0}
+                  status={getComplianceStatus(compliance?.daysSinceReconciliation || 0)}
+                  decimals={0}
+                />
+                <StatCard
+                  label="Unposted Journals"
+                  value={compliance?.unpostedJournals || 0}
+                  status={compliance && compliance.unpostedJournals > 0 ? 'yellow' : 'green'}
+                  decimals={0}
+                />
+                <StatCard
+                  label="Audit Exceptions"
+                  value={compliance?.auditExceptions || 0}
+                  status={compliance && compliance.auditExceptions > 0 ? 'red' : 'green'}
+                  decimals={0}
+                />
+              </div>
+
+              <AlertList
+                items={complianceAlerts}
+                emptyMessage="✓ Ready for audit - all checks passed"
+              />
+            </>
+          )}
+        </div>
       </div>
     </MainLayout>
   );
@@ -336,10 +360,10 @@ export async function getServerSideProps({ locale }: { locale: string }) {
   return {
     props: {
       ...(await import('next-i18next/serverSideTranslations').then(m =>
-        m.serverSideTranslations(locale, ['common', 'user'])
+        m.serverSideTranslations(locale, ['common', 'user', 'auth'])
       )),
     },
   };
 }
 
-export default AdminDashboard;
+export default AdminDashboardV2;

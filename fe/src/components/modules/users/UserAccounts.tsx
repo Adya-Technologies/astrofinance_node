@@ -116,13 +116,18 @@ const UserAccounts: React.FC<UserAccountsProps> = ({ userId }) => {
 		{
 			Header: "Actions",
 			accessor: "id",
-			Cell: ({ value }: { value: string }) => (
-				<Link href={`users/accounts/${value}`}>
-					<Button variant="outline" size="sm">
+			Cell: ({ value }: { value: string }) => {
+				const router = useRouter();
+				return (
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={() => router.push(`users/accounts/${value}`)}
+					>
 						View Details
 					</Button>
-				</Link>
-			),
+				);
+			},
 		},
 	];
 
@@ -130,12 +135,13 @@ const UserAccounts: React.FC<UserAccountsProps> = ({ userId }) => {
 		<div className="mt-6">
 			<div className="flex justify-between items-center mb-4">
 				<h2 className="text-lg font-medium text-gray-900">User Accounts</h2>
-				<Link href={`/users/accounts/new?userId=${userId}`}>
-					<Button className="flex items-center">
-						<PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-						New Account
-					</Button>
-				</Link>
+				<Button
+					className="flex items-center"
+					onClick={() => router.push(`/users/accounts/new?userId=${userId}`)}
+				>
+					<PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+					New Account
+				</Button>
 			</div>
 
 			{loading ? (
@@ -157,12 +163,13 @@ const UserAccounts: React.FC<UserAccountsProps> = ({ userId }) => {
 			) : accounts.length === 0 ? (
 				<div className="text-center py-10 bg-gray-50 rounded-md">
 					<p className="text-gray-500">No accounts found for this user.</p>
-					<Link href={`/users/accounts/new?userId=${userId}`}>
-						<Button className="mt-4 flex items-center mx-auto">
-							<PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-							Create First Account
-						</Button>
-					</Link>
+					<Button
+						className="mt-4 flex items-center mx-auto"
+						onClick={() => router.push(`/users/accounts/new?userId=${userId}`)}
+					>
+						<PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+						Create First Account
+					</Button>
 				</div>
 			) : (
 				<Table columns={accountColumns} data={accounts} keyField="id" />

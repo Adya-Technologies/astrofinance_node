@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { 
-  PlusIcon, 
-  PencilSquareIcon, 
-  TrashIcon, 
+import {
+  PlusIcon,
+  PencilSquareIcon,
+  TrashIcon,
   KeyIcon,
   EyeIcon
 } from '@heroicons/react/24/outline';
@@ -45,22 +45,22 @@ const StaffListPage: React.FC = () => {
 
     fetchStaff();
   }, []);
-  
+
   const handleDeleteClick = (staffMember: StaffProfile) => {
     setStaffToDelete(staffMember);
     setIsDeleteModalOpen(true);
   };
-  
+
   const handleDeleteConfirm = async () => {
     if (!staffToDelete) return;
-    
+
     try {
       setIsDeleting(true);
       await deleteStaff(staffToDelete.id);
-      
+
       // Update the staff list by removing the deleted staff
       setStaff(prevStaff => prevStaff.filter(s => s.id !== staffToDelete.id));
-      
+
       toast.success(`${staffToDelete.firstName} ${staffToDelete.lastName} has been deleted successfully`);
       setIsDeleteModalOpen(false);
       setStaffToDelete(null);
@@ -130,36 +130,33 @@ const StaffListPage: React.FC = () => {
       accessor: 'id',
       Cell: ({ row }: { row: { original: StaffProfile } }) => (
         <div className="flex space-x-2">
-          <Link href={`/office/staff/${row.original.id}`}>
-            <Button
-              variant="outline"
-              size="sm"
-              className="p-1"
-              title="View Details"
-            >
-              <EyeIcon className="h-4 w-4" />
-            </Button>
-          </Link>
-          <Link href={`/office/staff/${row.original.id}/edit`}>
-            <Button
-              variant="outline"
-              size="sm"
-              className="p-1"
-              title="Edit Staff"
-            >
-              <PencilSquareIcon className="h-4 w-4" />
-            </Button>
-          </Link>
-          <Link href={`/office/staff/${row.original.id}/reset-password`}>
-            <Button
-              variant="outline"
-              size="sm"
-              className="p-1"
-              title="Reset Password"
-            >
-              <KeyIcon className="h-4 w-4" />
-            </Button>
-          </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            className="p-1"
+            title="View Details"
+            onClick={() => router.push(`/office/staff/${row.original.id}`)}
+          >
+            <EyeIcon className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="p-1"
+            title="Edit Staff"
+            onClick={() => router.push(`/office/staff/${row.original.id}/edit`)}
+          >
+            <PencilSquareIcon className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="p-1"
+            title="Reset Password"
+            onClick={() => router.push(`/office/staff/${row.original.id}/reset-password`)}
+          >
+            <KeyIcon className="h-4 w-4" />
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -186,98 +183,100 @@ const StaffListPage: React.FC = () => {
               </p>
             </div>
             <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
-              <Link href="/office/staff/create">
-                <Button variant="primary" className="flex items-center">
-                  <PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-                  Add Staff
-                </Button>
-              </Link>
+              <Button
+                variant="primary"
+                className="flex items-center"
+                onClick={() => router.push('/office/staff/create')}
+              >
+                <PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+                Add Staff
+              </Button>
             </div>
           </div>
 
-        {error && (
-          <div className="mt-6 rounded-md bg-red-50 p-4">
-            <div className="flex">
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">Error</h3>
-                <div className="mt-2 text-sm text-red-700">
-                  <p>{error}</p>
+          {error && (
+            <div className="mt-6 rounded-md bg-red-50 p-4">
+              <div className="flex">
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">Error</h3>
+                  <div className="mt-2 text-sm text-red-700">
+                    <p>{error}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-4">
+            <div className="overflow-x-auto">
+              <div className="inline-block min-w-full">
+                <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+                  <div className="bg-white">
+                    {loading ? (
+                      <div className="p-6 text-center">Loading staff data...</div>
+                    ) : staff.length === 0 ? (
+                      <div className="p-6 text-center">No staff members found.</div>
+                    ) : (
+                      <Table
+                        columns={columns}
+                        data={staff}
+                        pagination={true}
+                        pageSize={10}
+                        keyField="id"
+                        isLoading={loading}
+                        emptyMessage="No staff members found."
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        )}
+        </div>
 
-        <div className="mt-4">
-          <div className="overflow-x-auto">
-            <div className="inline-block min-w-full">
-              <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
-                <div className="bg-white">
-                  {loading ? (
-                    <div className="p-6 text-center">Loading staff data...</div>
-                  ) : staff.length === 0 ? (
-                    <div className="p-6 text-center">No staff members found.</div>
-                  ) : (
-                    <Table
-                      columns={columns}
-                      data={staff}
-                      pagination={true}
-                      pageSize={10}
-                      keyField="id"
-                      isLoading={loading}
-                      emptyMessage="No staff members found."
-                    />
-                  )}
-                </div>
-              </div>
-            </div>
+        {/* Delete Confirmation Modal */}
+        <Modal
+          isOpen={isDeleteModalOpen}
+          onClose={() => {
+            if (!isDeleting) {
+              setIsDeleteModalOpen(false);
+              setStaffToDelete(null);
+            }
+          }}
+          title="Confirm Delete"
+        >
+          <div className="mt-2">
+            <p className="text-sm text-gray-500">
+              Are you sure you want to delete {staffToDelete?.firstName} {staffToDelete?.lastName}?
+              This action cannot be undone.
+            </p>
           </div>
-        </div>
-      </div>
-      
-      {/* Delete Confirmation Modal */}
-      <Modal
-        isOpen={isDeleteModalOpen}
-        onClose={() => {
-          if (!isDeleting) {
-            setIsDeleteModalOpen(false);
-            setStaffToDelete(null);
-          }
-        }}
-        title="Confirm Delete"
-      >
-        <div className="mt-2">
-          <p className="text-sm text-gray-500">
-            Are you sure you want to delete {staffToDelete?.firstName} {staffToDelete?.lastName}? 
-            This action cannot be undone.
-          </p>
-        </div>
 
-        <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
-          <Button
-            variant="danger"
-            className="w-full sm:w-auto sm:ml-3"
-            onClick={handleDeleteConfirm}
-            disabled={isDeleting}
-          >
-            {isDeleting ? 'Deleting...' : 'Delete'}
-          </Button>
-          <Button
-            variant="outline"
-            className="mt-3 w-full sm:mt-0 sm:w-auto"
-            onClick={() => {
-              if (!isDeleting) {
-                setIsDeleteModalOpen(false);
-                setStaffToDelete(null);
-              }
-            }}
-            disabled={isDeleting}
-          >
-            Cancel
-          </Button>
-        </div>
-      </Modal>
-    </MainLayout>
+          <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+            <Button
+              variant="danger"
+              className="w-full sm:w-auto sm:ml-3"
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </Button>
+            <Button
+              variant="outline"
+              className="mt-3 w-full sm:mt-0 sm:w-auto"
+              onClick={() => {
+                if (!isDeleting) {
+                  setIsDeleteModalOpen(false);
+                  setStaffToDelete(null);
+                }
+              }}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+          </div>
+        </Modal>
+      </MainLayout>
     </ProtectedRoute>
   );
 };
@@ -287,7 +286,7 @@ const StaffListPage: React.FC = () => {
 export async function getServerSideProps({ locale }: { locale: string }) {
   return {
     props: {
-      ...(await import('next-i18next/serverSideTranslations').then(m => 
+      ...(await import('next-i18next/serverSideTranslations').then(m =>
         m.serverSideTranslations(locale, ['common', 'user', 'auth'])
       )),
     },
