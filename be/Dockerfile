@@ -1,14 +1,19 @@
 # ---- base ----
 FROM node:20-alpine AS base
 RUN apk add --no-cache openssl libc6-compat
+RUN corepack enable && corepack prepare pnpm@11.3.0 --activate
 WORKDIR /app
 
 # ---- builder: install all deps and compile TypeScript ----
+# Uses pnpm-lock.yaml (the maintained lockfile) - package-lock.json in this
+# repo is stale and out of sync with package.json.
 FROM base AS builder
-COPY package.json package-lock.json ./
-RUN npm ci
+# Force devDependencies to install even if NODE_ENV=production leaks in as a build arg
+ENV NODE_ENV=development
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
 COPY . .
-RUN npm run build
+RUN pnpm run build
 
 # ---- runner: production image ----
 FROM base AS runner
