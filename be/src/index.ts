@@ -4,6 +4,10 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import express, { type Express } from "express";
+// Patches Express so any async route/middleware handler that throws or
+// rejects is forwarded to errorHandler instead of crashing the process.
+// Must be imported before any route modules are loaded.
+import "express-async-errors";
 import cors from "cors";
 import morgan from "morgan";
 import path from "path";
@@ -107,6 +111,18 @@ app.use(errorHandler);
 // Start server
 app.listen(port, () => {
 	logger.info(`Server is running on port ${port}`);
+});
+
+// Safety net: many controllers re-throw errors inside async route handlers
+// (e.g. `if (error instanceof ApiError) throw error;`). Express 4 does not
+// catch rejected promises from async handlers, so without this the process
+// would crash on any such error - taking down the whole API for every user
+// over something like one failed login attempt.
+process.on("unhandledRejection", (reason) => {
+	logger.error(`Unhandled promise rejection: ${reason instanceof Error ? reason.stack : reason}`);
+});
+process.on("uncaughtException", (err) => {
+	logger.error(`Uncaught exception: ${err.stack}`);
 });
 
 // Handle shutdown gracefully
