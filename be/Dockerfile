@@ -1,5 +1,6 @@
 # ---- base ----
-FROM node:20-alpine AS base
+# node:20 is below pnpm@11's minimum Node version (>=22.13), so use node:22
+FROM node:22-alpine AS base
 RUN apk add --no-cache openssl libc6-compat
 RUN corepack enable && corepack prepare pnpm@11.3.0 --activate
 WORKDIR /app

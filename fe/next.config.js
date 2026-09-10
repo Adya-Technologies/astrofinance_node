@@ -1,6 +1,17 @@
 /** @type {import('next').NextConfig} */
 const { i18n } = require('./next-i18next.config');
 
+// Normalizes NEXT_PUBLIC_API_URL into a bare origin (scheme + host, no /api
+// suffix) so the /uploads rewrite below always has a valid destination, even
+// if the env var is misconfigured (e.g. missing the http(s):// scheme).
+function resolveApiOrigin() {
+  const raw = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').trim();
+  const withoutApiSuffix = raw.replace(/\/api\/?$/, '');
+  return /^https?:\/\//.test(withoutApiSuffix)
+    ? withoutApiSuffix
+    : `https://${withoutApiSuffix}`;
+}
+
 const withPWA = require('@ducanh2912/next-pwa').default({
   dest: 'public',
   disable: process.env.NODE_ENV === 'development',
@@ -75,7 +86,7 @@ const nextConfig = {
         // Proxy uploads to backend server
         {
           source: '/uploads/:path*',
-          destination: `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace('/api', '')}/uploads/:path*`,
+          destination: `${resolveApiOrigin()}/uploads/:path*`,
         },
         {
           source: '/loans/types/new',
