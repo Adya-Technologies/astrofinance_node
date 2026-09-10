@@ -1,0 +1,14 @@
+node_modules
+.next
+out
+.env
+.env.*
+!.env.example
+frontend-dev.env
+*.log
+.git
+.gitignore
+.vscode
+.idea
+coverage
+*.md

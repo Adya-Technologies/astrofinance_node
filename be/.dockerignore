@@ -1,0 +1,21 @@
+node_modules
+dist
+npm-debug.log
+.env
+.env.*
+!.env.example
+backend-dev.env
+uploads/*
+!uploads/.gitkeep
+*.log
+logs
+coverage
+.nyc_output
+.git
+.gitignore
+.vscode
+.idea
+*.md
+temp_migration.sql
+test-document.txt
+Ashad 2082.xlsx

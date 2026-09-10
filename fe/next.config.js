@@ -10,6 +10,7 @@ const withPWA = require('@ducanh2912/next-pwa').default({
 
 const nextConfig = {
   i18n,
+  output: 'standalone',
   reactStrictMode: true,
   swcMinify: true,
   images: {
