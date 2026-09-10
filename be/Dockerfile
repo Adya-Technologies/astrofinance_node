@@ -12,6 +12,8 @@ FROM base AS builder
 # Force devDependencies to install even if NODE_ENV=production leaks in as a build arg
 ENV NODE_ENV=development
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# postinstall runs `prisma generate`, which needs the schema present already
+COPY src/prisma ./src/prisma
 RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm run build
